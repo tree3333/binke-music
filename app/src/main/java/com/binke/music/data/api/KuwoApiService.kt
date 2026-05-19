@@ -7,6 +7,8 @@ import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -435,6 +437,143 @@ class KuwoApiService {
         } catch (e: Exception) {
             Log.e("KuwoApi", "getLyrics error", e)
             emptyList()
+        }
+    }
+
+    /**
+     * 网易云歌词搜索（备用）
+     * 只搜歌词，不搜歌（歌要钱）
+     */
+    fun searchLyricsNetEase(name: String, artist: String): List<LrcLine> {
+        return try {
+            // 先搜索歌曲ID
+            val searchName = "${name.trim()} ${artist.trim()}"
+            val encoded = URLEncoder.encode(searchName, "UTF-8")
+            val searchUrl = "https://music.163.com/api/search/get"
+            val body = "s=$encoded&type=1&limit=1&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
+            val request = Request.Builder()
+                .url(searchUrl)
+                .post(body)
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("Referer", "https://music.163.com/")
+                .build()
+            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return emptyList() }
+            val searchJson = JSONObject(respStr)
+            val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return emptyList()
+            if (songs.length() == 0) return emptyList()
+            val songId = songs.getJSONObject(0).optString("id") ?: return emptyList()
+
+            // 再拿歌词
+            val lrcUrl = "https://music.163.com/api/song/lyric?id=$songId&lv=1&kv=1&tv=-1"
+            val lrcRequest = Request.Builder()
+                .url(lrcUrl)
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("Referer", "https://music.163.com/")
+                .build()
+            val lrcStr = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return emptyList() }
+            val lrcJson = JSONObject(lrcStr)
+            val lrcText = lrcJson.optJSONObject("lrc")?.optString("lyric") ?: return emptyList()
+
+            // 解析LRC格式
+            parseLrcText(lrcText)
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "searchLyricsNetEase error", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * QQ音乐歌词搜索（备用）
+     */
+    fun searchLyricsQQ(name: String, artist: String): List<LrcLine> {
+        return try {
+            // 用歌名搜，不加歌手避免搜索偏
+            val encoded = URLEncoder.encode(name.trim(), "UTF-8")
+            val searchUrl = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=$encoded&format=json&p=1&n=5"
+            val request = Request.Builder()
+                .url(searchUrl)
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("Referer", "https://y.qq.com/")
+                .build()
+            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return emptyList() }
+            val json = JSONObject(respStr)
+            val songs = json.optJSONObject("data")?.optJSONObject("song")?.optJSONArray("list") ?: return emptyList()
+
+            // 匹配歌手
+            var songmid: String? = null
+            for (i in 0 until songs.length()) {
+                val s = songs.getJSONObject(i)
+                val singers = s.optJSONArray("singer")
+                val singerNames = (0 until (singers?.length() ?: 0)).mapNotNull { singers?.getJSONObject(it)?.optString("name") }
+                if (singerNames.any { it.contains(artist) || artist.contains(it) } || artist.isBlank()) {
+                    songmid = s.optString("songmid")
+                    break
+                }
+            }
+            if (songmid == null && songs.length() > 0) {
+                songmid = songs.getJSONObject(0).optString("songmid")
+            }
+            if (songmid == null) return emptyList()
+
+            // 拿歌词
+            val lrcUrl = "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=$songmid&format=json&nobase64=1"
+            val lrcRequest = Request.Builder()
+                .url(lrcUrl)
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("Referer", "https://y.qq.com/portal/player.html")
+                .build()
+            val lrcResp = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return emptyList() }
+
+            val lrcJsonStr = lrcResp.trim().let {
+                val start = it.indexOf('{')
+                val end = it.lastIndexOf('}') + 1
+                if (start >= 0 && end > start) it.substring(start, end) else it
+            }
+            val lrcJson = JSONObject(lrcJsonStr)
+            // lyric可能是字符串也可能是{"lyric":"..."}对象
+            val lrcText = lrcJson.optString("lyric", "").takeIf { it.isNotBlank() }
+                ?: lrcJson.optJSONObject("lyric")?.optString("lyric", "")?.takeIf { it.isNotBlank() }
+                ?: return@searchLyricsQQ emptyList()
+
+            parseLrcText(lrcText)
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "searchLyricsQQ error", e)
+            emptyList()
+        }
+    }
+
+    private fun parseLrcText(lrcText: String): List<LrcLine> {
+        return lrcText.lineSequence()
+            .mapNotNull { line ->
+                val trimmed = line.trim()
+                if (!trimmed.startsWith("[")) return@mapNotNull null
+                val endIdx = trimmed.indexOf(']')
+                if (endIdx < 1) return@mapNotNull null
+                val timeStr = trimmed.substring(1, endIdx)
+                val text = trimmed.substring(endIdx + 1).trim()
+                if (text.isEmpty()) return@mapNotNull null
+                val time = parseLrcTime(timeStr)
+                if (time != null) LrcLine(time, text) else null
+            }
+            .toList()
+    }
+
+    private fun parseLrcTime(timeStr: String): Float? {
+        // 支持 [mm:ss.xxx] 或 [mm:ss.xx] 或 [mm:ss]
+        return try {
+            val parts = timeStr.split(":")
+            if (parts.size != 2) return null
+            val min = parts[0].toIntOrNull() ?: return null
+            val secPart = parts[1]
+            val secParts = secPart.split(".")
+            val sec = secParts[0].toIntOrNull() ?: return null
+            val ms = if (secParts.size > 1) {
+                val msStr = secParts[1].padEnd(3, '0').take(3)
+                msStr.toIntOrNull() ?: 0
+            } else 0
+            min * 60f + sec + ms / 1000f
+        } catch (_: Exception) {
+            null
         }
     }
 

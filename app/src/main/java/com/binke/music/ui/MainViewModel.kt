@@ -13,6 +13,7 @@ import com.binke.music.data.repository.MusicRepository
 import com.binke.music.player.MusicPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -290,9 +291,20 @@ class MainViewModel(
             refreshHistory()
 
             try {
-                val result = withContext(Dispatchers.IO) {
+                val playDeferred = viewModelScope.async(Dispatchers.IO) {
                     apiService.getPlayUrl(song.musicRid)
                 }
+                val lyricsDeferred = viewModelScope.async(Dispatchers.IO) {
+                    val kuwoLrc = apiService.getLyrics(song.rid.toString())
+                    if (kuwoLrc.isNotEmpty()) kuwoLrc
+                    else {
+                        val qqLrc = apiService.searchLyricsQQ(song.name, song.artist)
+                        if (qqLrc.isNotEmpty()) qqLrc
+                        else apiService.searchLyricsNetEase(song.name, song.artist)
+                    }
+                }
+
+                val result = playDeferred.await()
                 val playUrl = result.url
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
@@ -304,10 +316,7 @@ class MainViewModel(
                     _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${result.debugInfo}"
                 }
 
-                val lrc = withContext(Dispatchers.IO) {
-                    apiService.getLyrics(song.rid.toString())
-                }
-                _lyrics.value = lrc
+                _lyrics.value = lyricsDeferred.await()
             } catch (e: Exception) {
                 _playbackError.value = e.message ?: "播放失败"
             } finally {
