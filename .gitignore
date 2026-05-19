@@ -1,0 +1,14 @@
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+*.class
+*.dex
+*.jar
+*.log
+*.iml
+.idea/
+*.swp
+*.swo
+local.properties
