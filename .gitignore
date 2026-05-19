@@ -12,3 +12,4 @@ app/build/
 *.swp
 *.swo
 local.properties
+gradle/wrapper/gradle-wrapper.jar

@@ -36,7 +36,7 @@ data class Song(
                 rid = rid,
                 quality = when {
                     hasLossless -> "无损"
-                    (json["payInfo"]?.toString()?.contains("1111") == true) -> "高品"
+                    (json["payInfo"] as? Map<*, *>)?.get("down")?.toString()?.contains("1111") == true -> "高品"
                     else -> "标准"
                 },
                 favoriteCount = json["score100"]?.toString() ?: "--",
@@ -50,22 +50,39 @@ data class Song(
             val name = json["NAME"]?.toString() ?: json["SONGNAME"]?.toString() ?: return null
             val artist = json["ARTIST"]?.toString() ?: "未知歌手"
             val duration = json["DURATION"]?.toString()?.toIntOrNull() ?: 0
+            // 图片：album > artist pic
+            val albumPic = json["web_albumpic_short"]?.toString() ?: ""
+            val artistPic = json["web_artistpic_short"]?.toString() ?: ""
+            val pic = when {
+                albumPic.isNotBlank() -> "https://img2.kuwo.cn/star/albumcover/$albumPic"
+                artistPic.isNotBlank() -> "https://img2.kuwo.cn/star/starheads/$artistPic"
+                else -> ""
+            }
+            // 从MINFO判断音质：flac→无损，320→高品
+            val minfo = json["MINFO"]?.toString() ?: ""
+            val hasFlac = minfo.contains("format:flac", ignoreCase = true)
+            val has320 = minfo.contains("bitrate:320", ignoreCase = true)
+            // payInfo是嵌套对象，检查play字段
+            val payInfoPlay = (json["payInfo"] as? Map<*, *>)?.get("play")?.toString() ?: ""
+            val isVipOnly = payInfoPlay.startsWith("00")
+            val quality = when {
+                isVipOnly -> "VIP"
+                hasFlac -> "无损"
+                has320 -> "高品"
+                else -> "标准"
+            }
             return Song(
                 id = rid.toString(),
-                name = decodeBrokenText(name),
-                artist = decodeBrokenText(artist),
-                album = decodeBrokenText(json["ALBUM"]?.toString() ?: ""),
+                name = name,
+                artist = artist,
+                album = json["ALBUM"]?.toString() ?: "",
                 duration = duration,
                 durationText = formatDuration(duration),
-                pic = json["web_albumpic_short"]?.toString() ?: json["hts_MVPIC"]?.toString() ?: "",
+                pic = pic,
                 musicRid = musicRid,
                 rid = rid,
-                quality = when {
-                    json["MINFO"]?.toString()?.contains("flac", ignoreCase = true) == true -> "无损"
-                    json["MINFO"]?.toString()?.contains("320", ignoreCase = true) == true -> "高品"
-                    else -> "标准"
-                },
-                favoriteCount = json["musicrate"]?.toString() ?: "--",
+                quality = quality,
+                favoriteCount = json["score100"]?.toString() ?: "--",
                 albumId = json["ALBUMID"]?.toString() ?: ""
             )
         }

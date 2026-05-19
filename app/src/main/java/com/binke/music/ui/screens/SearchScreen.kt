@@ -172,13 +172,21 @@ fun SearchScreen(
                         Text("搜索历史", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(16.dp))
                         searchHistory.filter { it.isNotBlank() }.forEach { history ->
-                            ListItem(
-                                headlineContent = { Text(history, color = Color.White) },
-                                leadingContent = {
-                                    Icon(Icons.Filled.History, null, tint = Color.Gray)
-                                },
-                                modifier = Modifier.clickable { onSearch(history) }
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1D1D21))
+                                    .clickable { onSearch(history) }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.History, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(history, color = Color.White, fontSize = 15.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                 }

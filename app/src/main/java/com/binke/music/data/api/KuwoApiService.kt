@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
 
 /**
  * getPlayUrl 返回结果，包含地址和调试信息
@@ -206,6 +207,27 @@ class KuwoApiService {
     private val browserClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            val body = response.body ?: return@addInterceptor response
+            val contentEncoding = response.header("Content-Encoding")
+            if (contentEncoding.equals("gzip", ignoreCase = true)) {
+                val source = body.source()
+                source.request(Long.MAX_VALUE)
+                val buffer = source.buffer
+                val gzipBytes = buffer.clone().readByteArray()
+                try {
+                    val decompressed = GZIPInputStream(gzipBytes.inputStream()).readBytes()
+                    val decompressedBody = okhttp3.ResponseBody.create(body.contentType(), decompressed)
+                    return@addInterceptor response.newBuilder().body(decompressedBody)
+                        .removeHeader("Content-Encoding").build()
+                } catch (e: Exception) {
+                    Log.e("KuwoApi", "gzip decompress failed", e)
+                    return@addInterceptor response
+                }
+            }
+            return@addInterceptor response
+        }
         .build()
 
     private val playerClient = OkHttpClient.Builder()
@@ -275,8 +297,8 @@ class KuwoApiService {
     fun searchSongs(keyword: String, pn: Int = 0, rn: Int = 30): List<Song> {
         return try {
             val encoded = URLEncoder.encode(keyword, "UTF-8")
-            val url = "http://search.kuwo.cn/r.s?all=$encoded&ft=music&itemset=web_2013&client=kt&pn=$pn&rn=$rn&rformat=json&mobi=1&vipver=1&show_copyright_off=1&pcjson=1"
-            val response = get(url)
+            val url = "https://www.kuwo.cn/search/searchMusicBykeyWord?all=$encoded&vipver=1&client=kt&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&mobi=1&issubtitle=1&show_copyright_off=1&pn=$pn&rn=$rn"
+            val response = getWithCookie(url)
             val json = JSONObject(response)
             val absList = json.optJSONArray("abslist") ?: JSONArray()
             (0 until absList.length()).mapNotNull { i ->
@@ -285,6 +307,29 @@ class KuwoApiService {
         } catch (e: Exception) {
             Log.e("KuwoApi", "searchSongs error", e)
             emptyList()
+        }
+    }
+
+    private fun getWithCookie(urlStr: String): String {
+        val request = Request.Builder()
+            .url(urlStr)
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
+            .addHeader("Referer", "https://www.kuwo.cn/")
+            .addHeader("Cookie", "kw_token=RWQBXNPIE1K")
+            .addHeader("csrf", "RWQBXNPIE1K")
+            .build()
+        return browserClient.newCall(request).execute().use { response ->
+            val body = response.body ?: return ""
+            val contentEncoding = response.header("Content-Encoding") ?: ""
+            if (contentEncoding.equals("gzip", ignoreCase = true)) {
+                try {
+                    String(GZIPInputStream(body.byteStream()).readBytes(), Charset.forName("UTF-8"))
+                } catch (e: Exception) {
+                    body.string()
+                }
+            } else {
+                body.string()
+            }
         }
     }
 
