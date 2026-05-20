@@ -35,8 +35,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
@@ -311,6 +313,15 @@ private fun QueueDialog(
     onPlaySong: (Int) -> Unit,
     onRemoveSong: (Int) -> Unit
 ) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // 打开时自动滚动到当前播放的歌曲
+    LaunchedEffect(currentIndex) {
+        if (currentIndex in songs.indices) {
+            listState.scrollToItem(currentIndex)
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -324,15 +335,18 @@ private fun QueueDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.5f)   // ← 宽度缩小为0.5倍
+                    .fillMaxWidth(0.5f)
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(Color(0xFF171717))
                     .padding(20.dp)
                     .clickable(enabled = false) {}
             ) {
-                Text("当前歌曲列表", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)  // ← 24x2
+                Text("当前歌曲列表", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     itemsIndexed(songs) { index, song ->
                         Row(
                             modifier = Modifier
