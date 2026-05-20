@@ -119,7 +119,7 @@ fun PlaylistDrawer(
                             Text(
                                 text = playlist.name,
                                 color = Color.White,
-                                fontSize = 26.sp,
+                                fontSize = 52.sp,           // ← 26x2
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
@@ -128,14 +128,14 @@ fun PlaylistDrawer(
                             Text(
                                 text = if (playlist.creator.isNotBlank()) "创建者：${playlist.creator}" else "${songs.size}首歌曲",
                                 color = Color(0xFFBDBDBD),
-                                fontSize = 16.sp
+                                fontSize = 32.sp            // ← 16x2
                             )
                             if (playlist.description.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = playlist.description,
                                     color = Color(0xFF8E8E93),
-                                    fontSize = 14.sp,
+                                    fontSize = 28.sp,       // ← 14x2
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -161,11 +161,12 @@ fun PlaylistDrawer(
                     Button(
                         onClick = onPlayAll,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B5BFF)),
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(36.dp),   // ← 24x1.5
+                        modifier = Modifier.height(54.dp)    // ← 默认约36dp x1.5
                     ) {
-                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("播放全部")
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.dp))   // ← 22x1.5
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("播放全部", fontSize = 27.sp)    // ← 默认约18sp x1.5
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -212,7 +213,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit) {
             Text(
                 text = song.name,
                 color = Color.White,
-                fontSize = 17.sp,
+                fontSize = 34.sp,           // ← 17x2
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -221,7 +222,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit) {
             Text(
                 text = "${song.artist} · ${song.quality}",
                 color = Color(0xFFBDBDBD),
-                fontSize = 14.sp,
+                fontSize = 28.sp,           // ← 14x2
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -230,7 +231,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit) {
         Text(
             text = song.durationText,
             color = Color(0xFF8E8E93),
-            fontSize = 14.sp
+            fontSize = 28.sp               // ← 14x2
         )
     }
 }
