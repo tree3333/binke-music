@@ -178,8 +178,7 @@ fun MusicScreen(
 
                         // 加入歌单 + 收藏，与下方控制栏对齐
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // 前3个位置占位，与循环/上一首/播放对齐
