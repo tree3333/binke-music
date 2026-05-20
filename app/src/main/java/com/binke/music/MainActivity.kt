@@ -324,13 +324,13 @@ private fun QueueDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.5f)   // ← 宽度缩小为0.5倍
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(Color(0xFF171717))
                     .padding(20.dp)
                     .clickable(enabled = false) {}
             ) {
-                Text("当前歌曲列表", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("当前歌曲列表", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)  // ← 24x2
                 Spacer(modifier = Modifier.height(16.dp))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     itemsIndexed(songs) { index, song ->
@@ -347,17 +347,25 @@ private fun QueueDialog(
                                 imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = null,
                                 tint = if (index == currentIndex) Color(0xFF8B7DFF) else Color(0xFF8E8E93),
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(52.dp)   // ← 26x2
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(song.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(song.name, color = Color.White, fontSize = 32.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)   // ← 16x2
                                 Spacer(modifier = Modifier.width(2.dp))
-                                Text(song.artist, color = Color(0xFF8E8E93), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(song.artist, color = Color(0xFF8E8E93), fontSize = 26.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)   // ← 13x2
                             }
-                            Text(song.durationText, color = Color(0xFF8E8E93), fontSize = 13.sp)
-                            IconButton(onClick = { onRemoveSong(index) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "删除", tint = Color(0xFF8E8E93))
+                            Text(song.durationText, color = Color(0xFF8E8E93), fontSize = 26.sp)   // ← 13x2
+                            IconButton(
+                                onClick = { onRemoveSong(index) },
+                                modifier = Modifier.size(52.dp)   // ← 删除图标按钮x2
+                            ) {
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = "删除",
+                                    tint = Color(0xFF8E8E93),
+                                    modifier = Modifier.fillMaxSize()   // ← 图标填满按钮
+                                )
                             }
                         }
                     }
