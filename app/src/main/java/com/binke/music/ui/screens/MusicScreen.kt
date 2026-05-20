@@ -141,8 +141,11 @@ fun MusicScreen(
 
                     Spacer(modifier = Modifier.height(22.dp))
 
+                    // 歌名品质歌手 + 右侧按钮：整体向中间对齐
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -180,25 +183,24 @@ fun MusicScreen(
                                     imageVector = Icons.Filled.Add,
                                     contentDescription = "加入歌单",
                                     tint = Color(0xFF9FA8FF),
-                                    modifier = Modifier.size(51.dp)
+                                    modifier = Modifier.size(102.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(onClick = onToggleFavorite) {
-                                    Icon(
-                                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                        contentDescription = "收藏",
-                                        tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                                        modifier = Modifier.size(51.dp)
-                                    )
-                                }
+                            IconButton(onClick = onToggleFavorite) {
+                                Icon(
+                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    contentDescription = "收藏",
+                                    tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                                    modifier = Modifier.size(102.dp)
+                                )
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))
 
+                    // 进度条向中间缩进，与控制按钮对齐
                     Slider(
                         value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
                         onValueChange = { onSeek((it * duration).toLong()) },
@@ -207,11 +209,15 @@ fun MusicScreen(
                             activeTrackColor = Color(0xFF7B6DFF),
                             inactiveTrackColor = Color(0xFF404040)
                         ),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = 15.sp)
@@ -257,7 +263,7 @@ fun MusicScreen(
                                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                         contentDescription = if (isPlaying) "暂停" else "播放",
                                         tint = Color.White,
-                                        modifier = Modifier.size(42.dp)
+                                        modifier = Modifier.size(63.dp)
                                     )
                                 }
                             }
