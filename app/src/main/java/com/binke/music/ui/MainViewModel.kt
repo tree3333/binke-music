@@ -76,6 +76,13 @@ class MainViewModel(
     private val _currentIndex = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
+    private val _playlistSource = MutableStateFlow<PlaylistSource>(PlaylistSource.NONE)
+    val playlistSource: StateFlow<PlaylistSource> = _playlistSource.asStateFlow()
+
+    enum class PlaylistSource {
+        NONE, FAVORITES, HISTORY, CUSTOM
+    }
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -216,6 +223,7 @@ class MainViewModel(
             if (songs.isNotEmpty()) {
                 _playlist.value = songs
                 _currentIndex.value = startIndex.coerceIn(0, songs.lastIndex)
+                _playlistSource.value = PlaylistSource.NONE   // 首页歌单不关联"我的"标签
                 closePlaylistDrawer()
                 setTab(1)
                 playSongAt(_currentIndex.value)
@@ -354,6 +362,7 @@ class MainViewModel(
         if (favs.isNotEmpty()) {
             _playlist.value = favs
             _currentIndex.value = 0
+            _playlistSource.value = PlaylistSource.FAVORITES
             setTab(1)
             playSongAt(0)
         }
@@ -364,6 +373,7 @@ class MainViewModel(
         if (hist.isNotEmpty()) {
             _playlist.value = hist
             _currentIndex.value = 0
+            _playlistSource.value = PlaylistSource.HISTORY
             setTab(1)
             playSongAt(0)
         }
@@ -373,6 +383,7 @@ class MainViewModel(
         if (playlist.musicList.isNotEmpty()) {
             _playlist.value = playlist.musicList
             _currentIndex.value = 0
+            _playlistSource.value = PlaylistSource.CUSTOM
             setTab(1)
             playSongAt(0)
         }
@@ -449,24 +460,31 @@ class MainViewModel(
         mutable.removeAt(index)
         _playlist.value = mutable
 
-        // 同步从"我的"标签对应歌单中删除
+        // 只从当前来源歌单中删除
         viewModelScope.launch {
-            // 从收藏中删除
-            if (repository.isFavorite(song.id)) {
-                repository.removeFavorite(song.id)
-                refreshFavorites()
-            }
-            // 从历史中删除
-            repository.removeFromHistory(song.id)
-            refreshHistory()
-            // 从所有自定义歌单中删除
-            val playlists = repository.getAllPlaylists()
-            playlists.forEach { playlist ->
-                if (playlist.musicList.any { it.id == song.id }) {
-                    repository.removeSongFromPlaylist(playlist.id, song.id)
+            when (_playlistSource.value) {
+                PlaylistSource.FAVORITES -> {
+                    repository.removeFavorite(song.id)
+                    refreshFavorites()
+                }
+                PlaylistSource.HISTORY -> {
+                    repository.removeFromHistory(song.id)
+                    refreshHistory()
+                }
+                PlaylistSource.CUSTOM -> {
+                    // 从所有自定义歌单中删除（因为不知道具体是哪个）
+                    val playlists = repository.getAllPlaylists()
+                    playlists.forEach { playlist ->
+                        if (playlist.musicList.any { it.id == song.id }) {
+                            repository.removeSongFromPlaylist(playlist.id, song.id)
+                        }
+                    }
+                    refreshMineData()
+                }
+                PlaylistSource.NONE -> {
+                    // 首页歌单/搜索播放，不关联"我的"标签，不删除
                 }
             }
-            refreshMineData()
         }
 
         if (mutable.isEmpty()) {
