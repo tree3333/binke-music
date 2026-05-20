@@ -146,7 +146,7 @@ fun MusicScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
+                            .padding(start = 95.dp, end = 12.dp),   // ← 左对齐循环按钮
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -213,7 +213,9 @@ fun MusicScreen(
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    // 进度条向中间缩进，与控制按钮对齐
+                    // 进度条：左对齐循环按钮，右对齐歌单按钮
+                    val leftAlign = 95.dp
+                    val rightAlign = 95.dp
                     Slider(
                         value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
                         onValueChange = { onSeek((it * duration).toLong()) },
@@ -224,13 +226,13 @@ fun MusicScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
+                            .padding(start = leftAlign, end = rightAlign)
                     )
 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
+                            .padding(start = leftAlign, end = rightAlign),   // ← 同步移动
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = 22.sp)
