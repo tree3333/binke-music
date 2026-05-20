@@ -217,23 +217,23 @@ private fun PlaylistTile(
                     },
                     contentDescription = null,
                     tint = Color(0xFF7B6DFF),
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.size(144.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = playlist.name,
                 color = Color.White,
-                fontSize = 18.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "${playlist.total}首",
                 color = Color(0xFF8E8E93),
-                fontSize = 13.sp
+                fontSize = 26.sp
             )
         }
 
@@ -243,11 +243,11 @@ private fun PlaylistTile(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .size(30.dp)
+                    .size(60.dp)
                     .clip(CircleShape)
                     .background(Color.Red)
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Close, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(36.dp))
             }
         }
     }
@@ -270,10 +270,10 @@ private fun AddPlaylistTile(onClick: () -> Unit) {
                 imageVector = Icons.Filled.Add,
                 contentDescription = "新建歌单",
                 tint = Color(0xFF7B6DFF),
-                modifier = Modifier.size(70.dp)
+                modifier = Modifier.size(140.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("新增歌单", color = Color.White, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("新增歌单", color = Color.White, fontSize = 32.sp)
         }
     }
 }
