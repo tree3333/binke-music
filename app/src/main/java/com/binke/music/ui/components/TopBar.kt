@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -39,7 +40,9 @@ fun TopBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .offset(x = 209.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             TabItem("首页", currentTab == 0) { onTabSelected(0) }
