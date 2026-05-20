@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -99,7 +100,10 @@ fun PlaylistDrawer(
                     .padding(20.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         AsyncImage(
                             model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
                             contentDescription = null,
@@ -136,6 +140,19 @@ fun PlaylistDrawer(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                        }
+
+                        // 右上角关闭按钮，大小与下一首按钮一致（92.dp）
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(92.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "关闭",
+                                tint = Color.White,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
 

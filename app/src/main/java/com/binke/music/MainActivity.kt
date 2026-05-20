@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -375,26 +376,30 @@ private fun AddToPlaylistDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("加入歌曲列表") },
+        modifier = Modifier.padding(40.dp),
+        title = { Text("加入歌曲列表", fontSize = 36.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("将《$songName》加入以下歌单")
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("将《$songName》加入以下歌单", fontSize = 28.sp)
                 playlists.forEach { playlist ->
                     Button(
                         onClick = { onSelect(playlist.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A31))
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A31)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text(playlist.name)
+                        Text(playlist.name, fontSize = 28.sp)
                     }
                 }
                 if (playlists.isEmpty()) {
-                    Text("暂无自定义歌单，请先到“我的”中新建。", color = Color(0xFF8E8E93))
+                    Text("暂无自定义歌单，请先到“我的”中新建。", color = Color(0xFF8E8E93), fontSize = 28.sp)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text("关闭", fontSize = 28.sp) }
         }
     )
 }

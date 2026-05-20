@@ -162,7 +162,7 @@ fun MusicScreen(
                                 Text(
                                     text = song.quality,
                                     color = Color(0xFF9FA8FF),
-                                    fontSize = 16.sp,
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -232,8 +232,8 @@ fun MusicScreen(
                             .padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = 15.sp)
-                        Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = 15.sp)
+                        Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = 22.sp)
+                        Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = 22.sp)
                     }
 
                     Spacer(modifier = Modifier.height(22.dp))
