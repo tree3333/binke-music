@@ -66,6 +66,14 @@ class MusicRepository(private val context: Context) {
         }
     }
 
+    suspend fun removeFromHistory(songId: String) {
+        context.dataStore.edit { prefs ->
+            val current = parseSongList(prefs[historyKey] ?: "[]").toMutableList()
+            current.removeAll { it.id == songId }
+            prefs[historyKey] = serializeSongList(current)
+        }
+    }
+
     // 搜索历史
     suspend fun getSearchHistory(): List<String> {
         val json = context.dataStore.data.map { it[searchHistoryKey] ?: "[]" }.first()
@@ -172,6 +180,10 @@ class MusicRepository(private val context: Context) {
                 prefs[customPlaylistsKey] = serializePlaylists(current)
             }
         }
+    }
+
+    suspend fun getAllPlaylists(): List<Playlist> {
+        return getCustomPlaylists()
     }
 
     private fun parseSongList(json: String): List<Song> {

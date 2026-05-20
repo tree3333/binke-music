@@ -444,9 +444,31 @@ class MainViewModel(
 
     fun removeSongFromQueue(index: Int) {
         if (index !in _playlist.value.indices) return
+        val song = _playlist.value[index]
         val mutable = _playlist.value.toMutableList()
         mutable.removeAt(index)
         _playlist.value = mutable
+
+        // 同步从"我的"标签对应歌单中删除
+        viewModelScope.launch {
+            // 从收藏中删除
+            if (repository.isFavorite(song.id)) {
+                repository.removeFavorite(song.id)
+                refreshFavorites()
+            }
+            // 从历史中删除
+            repository.removeFromHistory(song.id)
+            refreshHistory()
+            // 从所有自定义歌单中删除
+            val playlists = repository.getAllPlaylists()
+            playlists.forEach { playlist ->
+                if (playlist.musicList.any { it.id == song.id }) {
+                    repository.removeSongFromPlaylist(playlist.id, song.id)
+                }
+            }
+            refreshMineData()
+        }
+
         if (mutable.isEmpty()) {
             _currentIndex.value = -1
             _currentSong.value = null
