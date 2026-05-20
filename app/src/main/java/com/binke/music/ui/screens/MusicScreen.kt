@@ -183,7 +183,7 @@ fun MusicScreen(
                                     imageVector = Icons.Filled.Add,
                                     contentDescription = "加入歌单",
                                     tint = Color(0xFF9FA8FF),
-                                    modifier = Modifier.size(102.dp)
+                                    modifier = Modifier.size(204.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
@@ -192,7 +192,7 @@ fun MusicScreen(
                                     imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = "收藏",
                                     tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                                    modifier = Modifier.size(102.dp)
+                                    modifier = Modifier.size(204.dp)
                                 )
                             }
                         }
@@ -240,41 +240,41 @@ fun MusicScreen(
                                 },
                                 contentDescription = "循环模式",
                                 tint = Color.White,
-                                modifier = Modifier.size(68.dp)
+                                modifier = Modifier.size(136.dp)
                             )
                         }
 
                         IconButton(onClick = onPrevious) {
-                            Icon(Icons.Filled.SkipPrevious, "上一首", modifier = Modifier.size(92.dp), tint = Color.White)
+                            Icon(Icons.Filled.SkipPrevious, "上一首", modifier = Modifier.size(184.dp), tint = Color.White)
                         }
 
                         Box(
                             modifier = Modifier
-                                .size(82.dp)
+                                .size(164.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF7B6DFF)),
                             contentAlignment = Alignment.Center
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(34.dp), strokeWidth = 3.dp)
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(68.dp), strokeWidth = 3.dp)
                             } else {
                                 IconButton(onClick = onPlayPause) {
                                     Icon(
                                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                         contentDescription = if (isPlaying) "暂停" else "播放",
                                         tint = Color.White,
-                                        modifier = Modifier.size(63.dp)
+                                        modifier = Modifier.size(126.dp)
                                     )
                                 }
                             }
                         }
 
                         IconButton(onClick = onNext) {
-                            Icon(Icons.Filled.SkipNext, "下一首", modifier = Modifier.size(92.dp), tint = Color.White)
+                            Icon(Icons.Filled.SkipNext, "下一首", modifier = Modifier.size(184.dp), tint = Color.White)
                         }
 
                         IconButton(onClick = onOpenQueue) {
-                            Icon(Icons.Filled.QueueMusic, "播放列表", modifier = Modifier.size(68.dp), tint = Color.White)
+                            Icon(Icons.Filled.QueueMusic, "播放列表", modifier = Modifier.size(136.dp), tint = Color.White)
                         }
                     }
                 }
