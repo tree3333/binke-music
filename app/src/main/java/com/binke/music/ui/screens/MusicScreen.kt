@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -188,7 +189,9 @@ fun MusicScreen(
                             Spacer(modifier = Modifier.size(82.dp))
                             IconButton(
                                 onClick = onAddToPlaylist,
-                                modifier = Modifier.size(82.dp)
+                                modifier = Modifier
+                                    .size(82.dp)
+                                    .offset(x = (-400).dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Add,
