@@ -83,7 +83,7 @@ private fun TabItem(text: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         text = text,
         color = if (selected) Color.White else Color(0xFF7B7B80),
-        fontSize = if (selected) 30.sp else 24.sp,
+        fontSize = if (selected) 60.sp else 48.sp,
         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         modifier = Modifier.clickable(onClick = onClick)
     )
