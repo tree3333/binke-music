@@ -359,62 +359,87 @@ class KuwoApiService {
     }
 
     /**
-     * 获取播放地址
+     * 获取播放地址（自动重试，最多重试3次）
      */
     fun getPlayUrl(rid: String, br: Int = 320, type: String = "mp3"): PlayUrlResult {
-        return try {
-            val musicId = rid.removePrefix("MUSIC_")
-            val qParams = "user=0&android_id=0&prod=kwplayerhd_ar_4.3.0.8&corp=kuwo&vipver=4.3.0.8&source=kwplayerhd_ar_4.3.0.8_tianbao_T1A_qirui.apk&notrace=0&type=convert_url2&br=$br&format=$type&sig=0&rid=$musicId&priority=bitrate&loginUid=0&network=WIFI&loginSid=0&mode=down"
-            val encrypted = kwDES.encrypt(qParams)
-            val encoded = URLEncoder.encode(encrypted, "UTF-8")
-            val url = "https://nmobi.kuwo.cn/mobi.s?f=kuwo&q=$encoded"
-            Log.d("KuwoApi", "getPlayUrl request url=$url")
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("User-Agent", KUWO_UA)
-                .addHeader("Accept", "*/*")
-                .addHeader("Accept-Language", "zh-CN,zh;q=0.9")
-                .addHeader("Host", "nmobi.kuwo.cn")
-                .addHeader("Connection", "Keep-Alive")
-                .build()
-            val response = playerClient.newCall(request).execute().body?.string() ?: ""
+        val maxRetries = 3
+        var lastException: Exception? = null
 
-            val kvUrl = response.lineSequence()
-                .map { it.trim() }
-                .firstOrNull { it.startsWith("url=", ignoreCase = true) }
-                ?.substringAfter("url=")
-                ?.trim()
-                ?.takeIf { it.startsWith("http", ignoreCase = true) }
+        for (attempt in 1..maxRetries) {
+            try {
+                val musicId = rid.removePrefix("MUSIC_")
+                val qParams = "user=0&android_id=0&prod=kwplayerhd_ar_4.3.0.8&corp=kuwo&vipver=4.3.0.8&source=kwplayerhd_ar_4.3.0.8_tianbao_T1A_qirui.apk&notrace=0&type=convert_url2&br=$br&format=$type&sig=0&rid=$musicId&priority=bitrate&loginUid=0&network=WIFI&loginSid=0&mode=down"
+                val encrypted = kwDES.encrypt(qParams)
+                val encoded = URLEncoder.encode(encrypted, "UTF-8")
+                val url = "https://nmobi.kuwo.cn/mobi.s?f=kuwo&q=$encoded"
+                Log.d("KuwoApi", "getPlayUrl attempt=$attempt url=$url")
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("User-Agent", KUWO_UA)
+                    .addHeader("Accept", "*/*")
+                    .addHeader("Accept-Language", "zh-CN,zh;q=0.9")
+                    .addHeader("Host", "nmobi.kuwo.cn")
+                    .addHeader("Connection", "Keep-Alive")
+                    .build()
+                val response = playerClient.newCall(request).execute().body?.string() ?: ""
 
-            val regexUrl = Regex("url=(https?://[^\\s]+)", RegexOption.IGNORE_CASE)
-                .find(response)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?.trim()
+                val kvUrl = response.lineSequence()
+                    .map { it.trim() }
+                    .firstOrNull { it.startsWith("url=", ignoreCase = true) }
+                    ?.substringAfter("url=")
+                    ?.trim()
+                    ?.takeIf { it.startsWith("http", ignoreCase = true) }
 
-            val afterSig = response.substringAfter("sig=", "").take(20)
-            val finalUrl = when {
-                !kvUrl.isNullOrBlank() -> kvUrl
-                !regexUrl.isNullOrBlank() -> regexUrl
-                response.trim().startsWith("http") -> response.trim()
-                else -> null
-            }?.substringBefore("sig=")
+                val regexUrl = Regex("url=(https?://[^\\s]+)", RegexOption.IGNORE_CASE)
+                    .find(response)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
 
-            val debugInfo = buildString {
-                append("原始响应前200字符:\n${response.take(200)}\n\n")
-                append("kvUrl=$kvUrl\n")
-                append("regexUrl=$regexUrl\n")
-                append("response以http开头=${response.trim().startsWith("http")}\n")
-                append("finalUrl=$finalUrl\n")
-                append("sig=后前20字符: $afterSig")
+                val afterSig = response.substringAfter("sig=", "").take(20)
+                val finalUrl = when {
+                    !kvUrl.isNullOrBlank() -> kvUrl
+                    !regexUrl.isNullOrBlank() -> regexUrl
+                    response.trim().startsWith("http") -> response.trim()
+                    else -> null
+                }?.substringBefore("sig=")
+
+                val debugInfo = buildString {
+                    append("attempt=$attempt\n")
+                    append("原始响应前200字符:\n${response.take(200)}\n\n")
+                    append("kvUrl=$kvUrl\n")
+                    append("regexUrl=$regexUrl\n")
+                    append("response以http开头=${response.trim().startsWith("http")}\n")
+                    append("finalUrl=$finalUrl\n")
+                    append("sig=后前20字符: $afterSig")
+                }
+                Log.d("KuwoApi", "getPlayUrl attempt=$attempt finalUrl=$finalUrl")
+
+                // 如果拿到有效地址立即返回
+                if (!finalUrl.isNullOrBlank()) {
+                    return PlayUrlResult(finalUrl, debugInfo)
+                }
+
+                // 无效地址也算失败，需要重试
+                Log.w("KuwoApi", "getPlayUrl attempt=$attempt 返回地址为空，将重试")
+
+            } catch (e: Exception) {
+                lastException = e
+                Log.w("KuwoApi", "getPlayUrl attempt=$attempt 异常: ${e.message}，将重试")
             }
-            Log.d("KuwoApi", "getPlayUrl finalUrl=$finalUrl")
 
-            PlayUrlResult(finalUrl, debugInfo)
-        } catch (e: Exception) {
-            Log.e("KuwoApi", "getPlayUrl error", e)
-            PlayUrlResult(null, "异常: ${e.message}")
+            // 不是最后一次，等待后重试
+            if (attempt < maxRetries) {
+                try {
+                    Thread.sleep(1000)
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
         }
+
+        Log.e("KuwoApi", "getPlayUrl 重试${maxRetries}次后仍失败")
+        return PlayUrlResult(null, "重试${maxRetries}次失败：${lastException?.message ?: "地址为空"}")
     }
 
     /**
