@@ -117,9 +117,10 @@ fun SearchScreen(
                 Button(
                     onClick = { onSearch(inputText) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B5BFF)),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(28.dp),
+                    modifier = Modifier.width(180.dp)   // ← 原约60dp x3
                 ) {
-                    Text("搜索", fontSize = 18.sp)
+                    Text("搜      索", fontSize = 27.sp)   // ← 18x1.5，中间6空格
                 }
             }
 
@@ -143,7 +144,7 @@ fun SearchScreen(
                             Text(
                                 text = "共 ${searchResults.size} 条结果",
                                 color = Color(0xFF8E8E93),
-                                fontSize = 14.sp,
+                                fontSize = 28.sp,           // ← 14x2
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
@@ -157,9 +158,9 @@ fun SearchScreen(
                     ) {
                         items(suggestions) { suggestion ->
                             ListItem(
-                                headlineContent = { Text(suggestion, color = Color.White) },
+                                headlineContent = { Text(suggestion, color = Color.White, fontSize = 32.sp) },   // ← x2
                                 leadingContent = {
-                                    Icon(Icons.Filled.Search, null, tint = Color.Gray)
+                                    Icon(Icons.Filled.Search, null, tint = Color.Gray, modifier = Modifier.size(48.dp))   // ← x2
                                 },
                                 modifier = Modifier.clickable { onSearch(suggestion) }
                             )
@@ -169,7 +170,7 @@ fun SearchScreen(
 
                 searchHistory.isNotEmpty() -> {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("搜索历史", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("搜索历史", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)   // ← 18x2
                         Spacer(modifier = Modifier.height(16.dp))
                         searchHistory.filter { it.isNotBlank() }.forEach { history ->
                             Box(
@@ -181,9 +182,9 @@ fun SearchScreen(
                                     .padding(horizontal = 14.dp, vertical = 12.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.History, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Filled.History, null, tint = Color.Gray, modifier = Modifier.size(40.dp))   // ← 20x2
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text(history, color = Color.White, fontSize = 15.sp)
+                                    Text(history, color = Color.White, fontSize = 30.sp)   // ← 15x2
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -193,7 +194,7 @@ fun SearchScreen(
 
                 else -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("输入关键词搜索歌曲", color = Color.Gray, fontSize = 18.sp)
+                        Text("输入关键词搜索歌曲", color = Color.Gray, fontSize = 36.sp)   // ← 18x2
                     }
                 }
             }
@@ -227,7 +228,7 @@ private fun SearchResultItem(song: Song, onClick: () -> Unit) {
             Text(
                 text = song.name,
                 color = Color.White,
-                fontSize = 18.sp,
+                fontSize = 36.sp,           // ← 18x2
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -236,14 +237,14 @@ private fun SearchResultItem(song: Song, onClick: () -> Unit) {
             Text(
                 text = song.artist,
                 color = Color(0xFFBDBDBD),
-                fontSize = 14.sp,
+                fontSize = 28.sp,           // ← 14x2
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${song.quality} · ${song.album.ifBlank { "未知专辑" }}",
                 color = Color(0xFF8E8E93),
-                fontSize = 13.sp,
+                fontSize = 26.sp,           // ← 13x2
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -253,7 +254,7 @@ private fun SearchResultItem(song: Song, onClick: () -> Unit) {
             Text(
                 text = song.durationText,
                 color = Color(0xFFBDBDBD),
-                fontSize = 14.sp
+                fontSize = 28.sp            // ← 14x2
             )
         }
     }
