@@ -136,7 +136,7 @@ fun MusicScreen(
                         model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
                         contentDescription = "专辑封面",
                         modifier = Modifier
-                            .size(360.dp)
+                            .size(432.dp)
                             .clip(RoundedCornerShape(24.dp)),
                         contentScale = ContentScale.Crop
                     )
