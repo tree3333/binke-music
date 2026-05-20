@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,7 +151,30 @@ fun MainScreen(viewModel: MainViewModel) {
                 onSearchClick = { viewModel.navigateTo(Page.SEARCH) }
             )
 
-            Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .pointerInput(currentTab) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                // 手势结束时不处理，在 onHorizontalDrag 中实时判断
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            // 右滑（dragAmount > 0）→ 切换到左边标签
+                            // 左滑（dragAmount < 0）→ 切换到右边标签
+                            val threshold = 80f
+                            when {
+                                dragAmount > threshold && currentTab > 0 -> {
+                                    viewModel.setTab(currentTab - 1)
+                                }
+                                dragAmount < -threshold && currentTab < 2 -> {
+                                    viewModel.setTab(currentTab + 1)
+                                }
+                            }
+                        }
+                    }
+            ) {
                 when (currentPage) {
                     Page.HOME -> HomeScreen(
                         recommendPlaylists = recommendPlaylists,
