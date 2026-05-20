@@ -38,6 +38,9 @@ fun TopBar(
             .padding(horizontal = 40.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 左侧留白占位，让标签自然居中
+        Spacer(modifier = Modifier.weight(1f))
+
         Row(horizontalArrangement = Arrangement.spacedBy(42.dp)) {
             TabItem("首页", currentTab == 0) { onTabSelected(0) }
             TabItem("音乐", currentTab == 1) { onTabSelected(1) }

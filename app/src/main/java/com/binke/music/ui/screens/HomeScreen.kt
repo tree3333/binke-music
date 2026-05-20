@@ -120,7 +120,7 @@ private fun PlaylistCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .height(180.dp),
+                .height(324.dp),
             contentScale = ContentScale.Crop
         )
         Spacer(modifier = Modifier.height(10.dp))
