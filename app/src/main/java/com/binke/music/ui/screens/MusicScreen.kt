@@ -202,7 +202,9 @@ fun MusicScreen(
                             }
                             IconButton(
                                 onClick = onToggleFavorite,
-                                modifier = Modifier.size(82.dp)
+                                modifier = Modifier
+                                    .size(82.dp)
+                                    .offset(x = (-76).dp)
                             ) {
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
