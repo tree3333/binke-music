@@ -68,7 +68,7 @@ fun HomeScreen(
                                 text = title,
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = Color.White,
-                                fontSize = 26.sp,
+                                fontSize = 52.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             PlaylistGrid(playlists = playlists, onPlaylistClick = onPlaylistClick)
@@ -127,7 +127,7 @@ private fun PlaylistCard(
         Text(
             text = playlist.name,
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = 32.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -140,7 +140,7 @@ private fun PlaylistCard(
                 else -> playlist.creator.ifBlank { "推荐歌单" }
             },
             color = Color(0xFF8E8E93),
-            fontSize = 12.sp,
+            fontSize = 24.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
