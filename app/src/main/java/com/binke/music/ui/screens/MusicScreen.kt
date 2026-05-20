@@ -176,11 +176,16 @@ fun MusicScreen(
                             }
                         }
 
-                        // 加入歌单（加号）+ 收藏，并排垂直居中，整体左移
+                        // 加入歌单 + 收藏，与下方控制栏对齐
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 100.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // 前3个位置占位，与循环/上一首/播放对齐
+                            Spacer(modifier = Modifier.size(68.dp))
+                            Spacer(modifier = Modifier.size(92.dp))
+                            Spacer(modifier = Modifier.size(82.dp))
                             IconButton(
                                 onClick = onAddToPlaylist,
                                 modifier = Modifier.size(82.dp)
@@ -192,7 +197,6 @@ fun MusicScreen(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
-                            Spacer(modifier = Modifier.width(108.dp))  // 8+100，加入歌单再左移100
                             IconButton(
                                 onClick = onToggleFavorite,
                                 modifier = Modifier.size(82.dp)
