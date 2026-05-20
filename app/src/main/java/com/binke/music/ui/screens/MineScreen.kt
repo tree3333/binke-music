@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
@@ -79,31 +78,7 @@ fun MineScreen(
             .background(Color(0xFF121212))
             .padding(24.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "我的",
-                    color = Color.White,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                IconButton(onClick = { deleteMode = !deleteMode }) {
-                    Icon(
-                        imageVector = if (deleteMode) Icons.Filled.Close else Icons.Filled.Edit,
-                        contentDescription = "管理模式",
-                        tint = if (deleteMode) Color.Red else Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            LazyVerticalGrid(
+        LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -139,7 +114,6 @@ fun MineScreen(
                     AddPlaylistTile { showCreateDialog = true }
                 }
             }
-        }
 
         if (showCreateDialog) {
             AlertDialog(
