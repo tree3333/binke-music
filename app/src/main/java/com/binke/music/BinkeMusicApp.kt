@@ -18,9 +18,17 @@ class BinkeMusicApp : Application() {
     
     override fun onCreate() {
         super.onCreate()
-        apiService = KuwoApiService()
-        musicRepository = MusicRepository(this)
-        musicPlayer = MusicPlayer(this)
-        musicPlayer.initialize()
+        try {
+            apiService = KuwoApiService()
+            musicRepository = MusicRepository(this)
+            musicPlayer = MusicPlayer(this)
+            musicPlayer.initialize()
+        } catch (e: Throwable) {
+            android.util.Log.e(TAG, "初始化失败", e)
+        }
+    }
+
+    companion object {
+        private const val TAG = "BinkeMusicApp"
     }
 }

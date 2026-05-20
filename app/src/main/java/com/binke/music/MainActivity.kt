@@ -67,9 +67,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        enableEdgeToEdge()
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        hideSystemUI()
+        try {
+            enableEdgeToEdge()
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            hideSystemUI()
+        } catch (e: Throwable) {
+            // Android 8.1 不兼容 API，忽略
+        }
 
         val app = application as BinkeMusicApp
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)

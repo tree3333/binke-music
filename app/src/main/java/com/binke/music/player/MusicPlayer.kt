@@ -161,6 +161,35 @@ class MusicPlayer(private val context: Context) {
 
     fun duration(): Long = player?.duration ?: 0
 
+    /**
+     * 接入 MediaSession 系统，供 PlaybackService 共享 ExoPlayer。
+     */
+    fun attachSessionPlayer(): ExoPlayer {
+        return player ?: throw IllegalStateException("call initialize() first")
+    }
+
+    fun setMetadata(name: String, artist: String, artUri: String) {
+        player?.let { p ->
+            if (p.mediaItemCount > 0) {
+                val currentItem = p.getMediaItemAt(p.currentMediaItemIndex)
+                val uri = currentItem.localConfiguration?.uri
+                if (uri != null) {
+                    val updatedItem = MediaItem.Builder()
+                        .setUri(uri)
+                        .setMediaMetadata(
+                            androidx.media3.common.MediaMetadata.Builder()
+                                .setTitle(name)
+                                .setArtist(artist)
+                                .setArtworkUri(if (artUri.isNotEmpty()) android.net.Uri.parse(artUri) else null)
+                                .build()
+                        )
+                        .build()
+                    p.replaceMediaItem(p.currentMediaItemIndex, updatedItem)
+                }
+            }
+        }
+    }
+
     fun release() {
         handler.removeCallbacks(progressRunnable)
         player?.release()
