@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
@@ -165,27 +166,34 @@ fun MusicScreen(
                                 Text(
                                     text = song.artist,
                                     color = Color(0xFFBDBDBD),
-                                    fontSize = 18.sp,
+                                    fontSize = 27.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            IconButton(onClick = onToggleFavorite) {
+                        // 加入歌单（加号）+ 收藏，并排垂直居中
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onAddToPlaylist) {
                                 Icon(
-                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    contentDescription = "收藏",
-                                    tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                                    modifier = Modifier.size(34.dp)
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = "加入歌单",
+                                    tint = Color(0xFF9FA8FF),
+                                    modifier = Modifier.size(51.dp)
                                 )
                             }
-                            Text(
-                                text = if (isFavorite) "已收藏" else song.favoriteCount,
-                                color = Color(0xFFBDBDBD),
-                                fontSize = 14.sp
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(onClick = onToggleFavorite) {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                        contentDescription = "收藏",
+                                        tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                                        modifier = Modifier.size(51.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -226,12 +234,12 @@ fun MusicScreen(
                                 },
                                 contentDescription = "循环模式",
                                 tint = Color.White,
-                                modifier = Modifier.size(34.dp)
+                                modifier = Modifier.size(68.dp)
                             )
                         }
 
                         IconButton(onClick = onPrevious) {
-                            Icon(Icons.Filled.SkipPrevious, "上一首", modifier = Modifier.size(46.dp), tint = Color.White)
+                            Icon(Icons.Filled.SkipPrevious, "上一首", modifier = Modifier.size(92.dp), tint = Color.White)
                         }
 
                         Box(
@@ -256,34 +264,13 @@ fun MusicScreen(
                         }
 
                         IconButton(onClick = onNext) {
-                            Icon(Icons.Filled.SkipNext, "下一首", modifier = Modifier.size(46.dp), tint = Color.White)
+                            Icon(Icons.Filled.SkipNext, "下一首", modifier = Modifier.size(92.dp), tint = Color.White)
                         }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            IconButton(onClick = onOpenQueue) {
-                                Icon(Icons.Filled.QueueMusic, "播放列表", modifier = Modifier.size(34.dp), tint = Color.White)
-                            }
-                            Text(
-                                text = "歌单",
-                                color = Color(0xFFBDBDBD),
-                                fontSize = 12.sp
-                            )
+                        IconButton(onClick = onOpenQueue) {
+                            Icon(Icons.Filled.QueueMusic, "播放列表", modifier = Modifier.size(68.dp), tint = Color.White)
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "加入歌曲列表",
-                        color = Color(0xFF9FA8FF),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF232336))
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                            .combinedClickable(onClick = onAddToPlaylist)
-                    )
                 }
             }
         }
@@ -340,7 +327,7 @@ private fun LyricsView(
 
     if (lyrics.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("暂无歌词", color = Color(0xFF6E6E73), fontSize = 22.sp)
+            Text("暂无歌词", color = Color(0xFF6E6E73), fontSize = 44.sp)
         }
         return
     }
@@ -348,16 +335,16 @@ private fun LyricsView(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        verticalArrangement = Arrangement.spacedBy(36.dp)
     ) {
         itemsIndexed(lyrics) { index, line ->
             val active = index == currentLineIndex
             Text(
                 text = line.text,
                 color = if (active) Color.White else Color(0xFF9A9A9F),
-                fontSize = if (active) 26.sp else 22.sp,
+                fontSize = if (active) 52.sp else 44.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                lineHeight = if (active) 36.sp else 30.sp,
+                lineHeight = if (active) 72.sp else 60.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
