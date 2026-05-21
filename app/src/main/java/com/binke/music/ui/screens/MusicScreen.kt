@@ -124,7 +124,7 @@ fun MusicScreen(
                     )
                 )
                 .padding(horizontal = 36.dp, vertical = 28.dp)
-                .padding(top = 60.dp)   // ← 整体往下移动60px
+                .padding(top = (-10).dp)   // ← 整体上移70dp
         ) {
             if (song == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
