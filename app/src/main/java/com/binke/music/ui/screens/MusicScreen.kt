@@ -191,7 +191,7 @@ fun MusicScreen(
                                 onClick = onAddToPlaylist,
                                 modifier = Modifier
                                     .size(82.dp)
-                                    .offset(x = (-344).dp)
+                                    .offset(x = (-186).dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Add,
