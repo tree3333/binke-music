@@ -45,7 +45,7 @@ fun TopBar(
                 .offset(x = 209.dp),
             horizontalArrangement = Arrangement.Center
         ) {
-            TabItem("首页", currentTab == 0) { onTabSelected(0) }
+            TabItem("推荐", currentTab == 0) { onTabSelected(0) }
             Spacer(modifier = Modifier.width(42.dp))
             TabItem("音乐", currentTab == 1) { onTabSelected(1) }
             Spacer(modifier = Modifier.width(42.dp))
