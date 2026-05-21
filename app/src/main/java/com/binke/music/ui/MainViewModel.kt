@@ -15,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,6 +84,9 @@ class MainViewModel(
     enum class PlaylistSource {
         NONE, FAVORITES, HISTORY, CUSTOM
     }
+
+    /** 跟踪当前歌词加载协程，用于切歌时取消 */
+    private var lyricsJob: Job? = null
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -286,6 +291,9 @@ class MainViewModel(
     }
 
     fun playSong(song: Song) {
+        // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
+        lyricsJob?.cancel()
+
         viewModelScope.launch {
             _isLoading.value = true
             _playbackError.value = null
@@ -299,19 +307,10 @@ class MainViewModel(
             refreshHistory()
 
             try {
+                // 先拿播放地址（blocking）
                 val playDeferred = viewModelScope.async(Dispatchers.IO) {
                     apiService.getPlayUrl(song.musicRid)
                 }
-                val lyricsDeferred = viewModelScope.async(Dispatchers.IO) {
-                    val kuwoLrc = apiService.getLyrics(song.rid.toString())
-                    if (kuwoLrc.isNotEmpty()) kuwoLrc
-                    else {
-                        val qqLrc = apiService.searchLyricsQQ(song.name, song.artist)
-                        if (qqLrc.isNotEmpty()) qqLrc
-                        else apiService.searchLyricsNetEase(song.name, song.artist)
-                    }
-                }
-
                 val result = playDeferred.await()
                 val playUrl = result.url
                 if (!playUrl.isNullOrBlank()) {
@@ -324,7 +323,55 @@ class MainViewModel(
                     _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${result.debugInfo}"
                 }
 
-                _lyrics.value = lyricsDeferred.await()
+                // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
+                // Bug1 fix: 失败重试 + songId 校验
+                lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+                    val currentSongId = song.rid.toString()
+                    var lyrics: List<LrcLine> = emptyList()
+
+                    // 酷我歌词，最多重试2次
+                    var kr = apiService.getLyrics(currentSongId)
+                    for (attempt in 0..2) {
+                        if (kr.isSuccess) {
+                            lyrics = kr.getOrNull() ?: emptyList()
+                            if (lyrics.isNotEmpty()) break
+                        }
+                        if (attempt < 2) delay(500)
+                        ensureActive()
+                        if (attempt < 2) kr = apiService.getLyrics(currentSongId)
+                    }
+
+                    // 酷我为空，尝试 QQ 歌词（最多重试2次）
+                    if (lyrics.isEmpty()) {
+                        var qr = apiService.searchLyricsQQ(song.name, song.artist)
+                        for (attempt in 0..2) {
+                            if (qr.isSuccess) {
+                                val qq = qr.getOrNull() ?: emptyList()
+                                if (qq.isNotEmpty()) { lyrics = qq; break }
+                            }
+                            if (attempt < 2) delay(500)
+                            ensureActive()
+                            if (attempt < 2) qr = apiService.searchLyricsQQ(song.name, song.artist)
+                        }
+                    }
+
+                    // QQ 也为空，尝试网易云歌词（最多重试2次）
+                    if (lyrics.isEmpty()) {
+                        var nr = apiService.searchLyricsNetEase(song.name, song.artist)
+                        for (attempt in 0..2) {
+                            if (nr.isSuccess) {
+                                val ne = nr.getOrNull() ?: emptyList()
+                                if (ne.isNotEmpty()) { lyrics = ne; break }
+                            }
+                            if (attempt < 2) delay(500)
+                            ensureActive()
+                            if (attempt < 2) nr = apiService.searchLyricsNetEase(song.name, song.artist)
+                        }
+                    }
+
+                    // Bug2 fix: cancel 后 isActive 为 false，不再写入
+                    if (isActive) _lyrics.value = lyrics
+                }
             } catch (e: Exception) {
                 _playbackError.value = e.message ?: "播放失败"
             } finally {

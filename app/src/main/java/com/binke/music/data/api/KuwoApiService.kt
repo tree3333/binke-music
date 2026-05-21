@@ -444,34 +444,35 @@ class KuwoApiService {
 
     /**
      * 获取歌词
+     * @return Result.success(list) 或 Result.failure(exception)
      */
-    fun getLyrics(musicId: String): List<LrcLine> {
+    fun getLyrics(musicId: String): Result<List<LrcLine>> {
         return try {
             val url = "http://m.kuwo.cn/newh5/singles/songinfoandlrc?musicId=$musicId&httpsStatus=1"
             val response = get(url)
             val json = JSONObject(response)
-            if (json.optInt("status") != 200) return emptyList()
-            val data = json.optJSONObject("data") ?: return emptyList()
-            val lrclist = data.optJSONArray("lrclist") ?: return emptyList()
-            (0 until lrclist.length()).mapNotNull { i ->
+            if (json.optInt("status") != 200) return Result.failure(Exception("酷我歌词接口状态码非200"))
+            val data = json.optJSONObject("data") ?: return Result.success(emptyList())
+            val lrclist = data.optJSONArray("lrclist") ?: return Result.success(emptyList())
+            val lines = (0 until lrclist.length()).mapNotNull { i ->
                 val item = lrclist.getJSONObject(i)
                 val time = item.optString("time", "0").toFloatOrNull() ?: 0f
                 val text = item.optString("lineLyric", "").trim()
                 if (text.isNotEmpty()) LrcLine(time, text) else null
             }
+            Result.success(lines)
         } catch (e: Exception) {
             Log.e("KuwoApi", "getLyrics error", e)
-            emptyList()
+            Result.failure(e)
         }
     }
 
     /**
      * 网易云歌词搜索（备用）
-     * 只搜歌词，不搜歌（歌要钱）
+     * @return Result.success(list) 或 Result.failure(exception)
      */
-    fun searchLyricsNetEase(name: String, artist: String): List<LrcLine> {
+    fun searchLyricsNetEase(name: String, artist: String): Result<List<LrcLine>> {
         return try {
-            // 先搜索歌曲ID
             val searchName = "${name.trim()} ${artist.trim()}"
             val encoded = URLEncoder.encode(searchName, "UTF-8")
             val searchUrl = "https://music.163.com/api/search/get"
@@ -482,37 +483,35 @@ class KuwoApiService {
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .addHeader("Referer", "https://music.163.com/")
                 .build()
-            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return emptyList() }
+            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return Result.failure(Exception("网易云搜索请求为空")) }
             val searchJson = JSONObject(respStr)
-            val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return emptyList()
-            if (songs.length() == 0) return emptyList()
-            val songId = songs.getJSONObject(0).optString("id") ?: return emptyList()
+            val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return Result.success(emptyList())
+            if (songs.length() == 0) return Result.success(emptyList())
+            val songId = songs.getJSONObject(0).optString("id") ?: return Result.success(emptyList())
 
-            // 再拿歌词
             val lrcUrl = "https://music.163.com/api/song/lyric?id=$songId&lv=1&kv=1&tv=-1"
             val lrcRequest = Request.Builder()
                 .url(lrcUrl)
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .addHeader("Referer", "https://music.163.com/")
                 .build()
-            val lrcStr = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return emptyList() }
+            val lrcStr = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return Result.failure(Exception("网易云歌词请求为空")) }
             val lrcJson = JSONObject(lrcStr)
-            val lrcText = lrcJson.optJSONObject("lrc")?.optString("lyric") ?: return emptyList()
+            val lrcText = lrcJson.optJSONObject("lrc")?.optString("lyric") ?: return Result.success(emptyList())
 
-            // 解析LRC格式
-            parseLrcText(lrcText)
+            Result.success(parseLrcText(lrcText))
         } catch (e: Exception) {
             Log.e("KuwoApi", "searchLyricsNetEase error", e)
-            emptyList()
+            Result.failure(e)
         }
     }
 
     /**
      * QQ音乐歌词搜索（备用）
+     * @return Result.success(list) 或 Result.failure(exception)
      */
-    fun searchLyricsQQ(name: String, artist: String): List<LrcLine> {
+    fun searchLyricsQQ(name: String, artist: String): Result<List<LrcLine>> {
         return try {
-            // 用歌名搜，不加歌手避免搜索偏
             val encoded = URLEncoder.encode(name.trim(), "UTF-8")
             val searchUrl = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=$encoded&format=json&p=1&n=5"
             val request = Request.Builder()
@@ -520,11 +519,10 @@ class KuwoApiService {
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .addHeader("Referer", "https://y.qq.com/")
                 .build()
-            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return emptyList() }
+            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return Result.failure(Exception("QQ音乐搜索请求为空")) }
             val json = JSONObject(respStr)
-            val songs = json.optJSONObject("data")?.optJSONObject("song")?.optJSONArray("list") ?: return emptyList()
+            val songs = json.optJSONObject("data")?.optJSONObject("song")?.optJSONArray("list") ?: return Result.success(emptyList())
 
-            // 匹配歌手
             var songmid: String? = null
             for (i in 0 until songs.length()) {
                 val s = songs.getJSONObject(i)
@@ -538,16 +536,15 @@ class KuwoApiService {
             if (songmid == null && songs.length() > 0) {
                 songmid = songs.getJSONObject(0).optString("songmid")
             }
-            if (songmid == null) return emptyList()
+            if (songmid == null) return Result.success(emptyList())
 
-            // 拿歌词
             val lrcUrl = "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=$songmid&format=json&nobase64=1"
             val lrcRequest = Request.Builder()
                 .url(lrcUrl)
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .addHeader("Referer", "https://y.qq.com/portal/player.html")
                 .build()
-            val lrcResp = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return emptyList() }
+            val lrcResp = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return Result.failure(Exception("QQ音乐歌词请求为空")) }
 
             val lrcJsonStr = lrcResp.trim().let {
                 val start = it.indexOf('{')
@@ -555,15 +552,14 @@ class KuwoApiService {
                 if (start >= 0 && end > start) it.substring(start, end) else it
             }
             val lrcJson = JSONObject(lrcJsonStr)
-            // lyric可能是字符串也可能是{"lyric":"..."}对象
             val lrcText = lrcJson.optString("lyric", "").takeIf { it.isNotBlank() }
                 ?: lrcJson.optJSONObject("lyric")?.optString("lyric", "")?.takeIf { it.isNotBlank() }
-                ?: return@searchLyricsQQ emptyList()
+                ?: return Result.success(emptyList())
 
-            parseLrcText(lrcText)
+            Result.success(parseLrcText(lrcText))
         } catch (e: Exception) {
             Log.e("KuwoApi", "searchLyricsQQ error", e)
-            emptyList()
+            Result.failure(e)
         }
     }
 
