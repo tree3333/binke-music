@@ -259,9 +259,10 @@ fun MainScreen(viewModel: MainViewModel) {
         if (showPlaylistPicker && playlistPickerSong != null) {
             AddToPlaylistDialog(
                 songName = playlistPickerSong?.name.orEmpty(),
+                songId = playlistPickerSong?.id.orEmpty(),
                 playlists = customPlaylists,
                 onDismiss = { viewModel.closePlaylistPicker() },
-                onSelect = { viewModel.addCurrentSongToPlaylist(it) }
+                onSelect = { viewModel.addCurrentSongToPlaylist(it) },
             )
         }
 
@@ -392,6 +393,7 @@ private fun QueueDialog(
 @Composable
 private fun AddToPlaylistDialog(
     songName: String,
+    songId: String,
     playlists: List<Playlist>,
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit
@@ -399,11 +401,12 @@ private fun AddToPlaylistDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(40.dp),
-        title = { Text("加入歌曲列表", fontSize = 36.sp) },
+        title = { Text("加入歌单", fontSize = 36.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("将《$songName》加入以下歌单", fontSize = 28.sp)
+                Text("《$songName》", fontSize = 28.sp)
                 playlists.forEach { playlist ->
+                    val isInPlaylist = playlist.musicList.any { it.id == songId }
                     Button(
                         onClick = { onSelect(playlist.id) },
                         modifier = Modifier
@@ -412,11 +415,14 @@ private fun AddToPlaylistDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A31)),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text(playlist.name, fontSize = 28.sp)
+                        Text(playlist.name, fontSize = 28.sp, modifier = Modifier.weight(1f))
+                        if (isInPlaylist) {
+                            Text("✓", fontSize = 28.sp, color = Color.White)
+                        }
                     }
                 }
                 if (playlists.isEmpty()) {
-                    Text("暂无自定义歌单，请先到“我的”中新建。", color = Color(0xFF8E8E93), fontSize = 28.sp)
+                    Text("暂无自定义歌单，请先到\u201c我的\u201d中新建。", color = Color(0xFF8E8E93), fontSize = 28.sp)
                 }
             }
         },
