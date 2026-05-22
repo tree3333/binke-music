@@ -121,14 +121,14 @@ fun MineScreen(
         if (showCreateDialog) {
             Dialog(onDismissRequest = { showCreateDialog = false }) {
                 Surface(
-                    modifier = Modifier.size(560.dp, 320.dp),
+                    modifier = Modifier.size(560.dp, 360.dp),
                     shape = RoundedCornerShape(24.dp),
                     color = Color(0xFF1C1C1E)
                 ) {
                     Column(
                         modifier = Modifier.padding(40.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(32.dp)
+                        verticalArrangement = Arrangement.spacedBy(28.dp)
                     ) {
                         Text("新建歌单", fontSize = 40.sp, color = Color.White)
                         OutlinedTextField(
@@ -145,7 +145,7 @@ fun MineScreen(
                         ) {
                             TextButton(
                                 onClick = { showCreateDialog = false },
-                                modifier = Modifier.size(120.dp, 60.dp)
+                                modifier = Modifier.defaultMinSize(minWidth = 120.dp, minHeight = 60.dp)
                             ) {
                                 Text("取消", fontSize = 32.sp, color = Color(0xFF8E8E93))
                             }
@@ -157,7 +157,7 @@ fun MineScreen(
                                         showCreateDialog = false
                                     }
                                 },
-                                modifier = Modifier.size(120.dp, 60.dp)
+                                modifier = Modifier.defaultMinSize(minWidth = 120.dp, minHeight = 60.dp)
                             ) {
                                 Text("创建", fontSize = 32.sp, color = Color(0xFF0A84FF))
                             }
