@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -122,7 +121,7 @@ fun MineScreen(
         if (showCreateDialog) {
             Dialog(onDismissRequest = { showCreateDialog = false }) {
                 Surface(
-                    modifier = Modifier.size(560.dp, 400.dp),
+                    modifier = Modifier.size(560.dp, 320.dp),
                     shape = RoundedCornerShape(24.dp),
                     color = Color(0xFF1C1C1E)
                 ) {
@@ -141,14 +140,13 @@ fun MineScreen(
                             modifier = Modifier.fillMaxWidth().height(80.dp)
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                            modifier = Modifier.align(Alignment.End)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            TextButton(
-                                onClick = { showCreateDialog = false },
-                                modifier = Modifier.width(120.dp).heightIn(min = 60.dp)
-                            ) {
-                                Text("取消", fontSize = 32.sp, color = Color(0xFF8E8E93))
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { showCreateDialog = false }) {
+                                Text("取消", fontSize = 28.sp, color = Color(0xFF8E8E93))
                             }
                             TextButton(
                                 onClick = {
@@ -157,10 +155,9 @@ fun MineScreen(
                                         newPlaylistName = ""
                                         showCreateDialog = false
                                     }
-                                },
-                                modifier = Modifier.width(120.dp).heightIn(min = 60.dp)
+                                }
                             ) {
-                                Text("创建", fontSize = 32.sp, color = Color(0xFF0A84FF))
+                                Text("创建", fontSize = 28.sp, color = Color(0xFF0A84FF))
                             }
                         }
                     }
