@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -121,7 +122,7 @@ fun MineScreen(
         if (showCreateDialog) {
             Dialog(onDismissRequest = { showCreateDialog = false }) {
                 Surface(
-                    modifier = Modifier.size(560.dp, 360.dp),
+                    modifier = Modifier.size(560.dp, 400.dp),
                     shape = RoundedCornerShape(24.dp),
                     color = Color(0xFF1C1C1E)
                 ) {
@@ -145,7 +146,7 @@ fun MineScreen(
                         ) {
                             TextButton(
                                 onClick = { showCreateDialog = false },
-                                modifier = Modifier.defaultMinSize(minWidth = 120.dp, minHeight = 60.dp)
+                                modifier = Modifier.width(120.dp).heightIn(min = 60.dp)
                             ) {
                                 Text("取消", fontSize = 32.sp, color = Color(0xFF8E8E93))
                             }
@@ -157,7 +158,7 @@ fun MineScreen(
                                         showCreateDialog = false
                                     }
                                 },
-                                modifier = Modifier.defaultMinSize(minWidth = 120.dp, minHeight = 60.dp)
+                                modifier = Modifier.width(120.dp).heightIn(min = 60.dp)
                             ) {
                                 Text("创建", fontSize = 32.sp, color = Color(0xFF0A84FF))
                             }
