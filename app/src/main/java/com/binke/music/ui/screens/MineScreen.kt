@@ -143,16 +143,22 @@ fun MineScreen(
                             horizontalArrangement = Arrangement.spacedBy(24.dp),
                             modifier = Modifier.align(Alignment.End)
                         ) {
-                            TextButton(onClick = { showCreateDialog = false }) {
+                            TextButton(
+                                onClick = { showCreateDialog = false },
+                                modifier = Modifier.size(120.dp, 60.dp)
+                            ) {
                                 Text("取消", fontSize = 32.sp, color = Color(0xFF8E8E93))
                             }
-                            TextButton(onClick = {
-                                if (newPlaylistName.isNotBlank()) {
-                                    onCreatePlaylist(newPlaylistName)
-                                    newPlaylistName = ""
-                                    showCreateDialog = false
-                                }
-                            }) {
+                            TextButton(
+                                onClick = {
+                                    if (newPlaylistName.isNotBlank()) {
+                                        onCreatePlaylist(newPlaylistName)
+                                        newPlaylistName = ""
+                                        showCreateDialog = false
+                                    }
+                                },
+                                modifier = Modifier.size(120.dp, 60.dp)
+                            ) {
                                 Text("创建", fontSize = 32.sp, color = Color(0xFF0A84FF))
                             }
                         }
