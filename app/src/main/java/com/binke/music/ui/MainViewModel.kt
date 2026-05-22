@@ -85,6 +85,9 @@ class MainViewModel(
         NONE, FAVORITES, HISTORY, CUSTOM
     }
 
+    private val _currentCustomPlaylistId = MutableStateFlow<String?>(null)
+    val currentCustomPlaylistId: StateFlow<String?> = _currentCustomPlaylistId.asStateFlow()
+
     /** 跟踪当前歌词加载协程，用于切歌时取消 */
     private var lyricsJob: Job? = null
 
@@ -431,6 +434,7 @@ class MainViewModel(
             _playlist.value = playlist.musicList
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.CUSTOM
+            _currentCustomPlaylistId.value = playlist.id
             setTab(1)
             playSongAt(0)
         }
@@ -519,12 +523,9 @@ class MainViewModel(
                     refreshHistory()
                 }
                 PlaylistSource.CUSTOM -> {
-                    // 从所有自定义歌单中删除（因为不知道具体是哪个）
-                    val playlists = repository.getAllPlaylists()
-                    playlists.forEach { playlist ->
-                        if (playlist.musicList.any { it.id == song.id }) {
-                            repository.removeSongFromPlaylist(playlist.id, song.id)
-                        }
+                    // 只从当前播放的自定义歌单中删除
+                    _currentCustomPlaylistId.value?.let { playlistId ->
+                        repository.removeSongFromPlaylist(playlistId, song.id)
                     }
                     refreshMineData()
                 }
