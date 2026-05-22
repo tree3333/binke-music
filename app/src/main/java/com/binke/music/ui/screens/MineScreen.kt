@@ -30,9 +30,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 
@@ -116,32 +119,46 @@ fun MineScreen(
             }
 
         if (showCreateDialog) {
-            AlertDialog(
-                onDismissRequest = { showCreateDialog = false },
-                title = { Text("新建歌单") },
-                text = {
-                    OutlinedTextField(
-                        value = newPlaylistName,
-                        onValueChange = { newPlaylistName = it },
-                        placeholder = { Text("歌单名称") },
-                        singleLine = true
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            if (newPlaylistName.isNotBlank()) {
-                                onCreatePlaylist(newPlaylistName)
-                                newPlaylistName = ""
-                                showCreateDialog = false
+            Dialog(onDismissRequest = { showCreateDialog = false }) {
+                Surface(
+                    modifier = Modifier.size(560.dp, 320.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF1C1C1E)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(32.dp)
+                    ) {
+                        Text("新建歌单", fontSize = 40.sp, color = Color.White)
+                        OutlinedTextField(
+                            value = newPlaylistName,
+                            onValueChange = { newPlaylistName = it },
+                            placeholder = { Text("歌单名称", fontSize = 32.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 32.sp),
+                            modifier = Modifier.fillMaxWidth().height(80.dp)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            TextButton(onClick = { showCreateDialog = false }) {
+                                Text("取消", fontSize = 32.sp, color = Color(0xFF8E8E93))
+                            }
+                            TextButton(onClick = {
+                                if (newPlaylistName.isNotBlank()) {
+                                    onCreatePlaylist(newPlaylistName)
+                                    newPlaylistName = ""
+                                    showCreateDialog = false
+                                }
+                            }) {
+                                Text("创建", fontSize = 32.sp, color = Color(0xFF0A84FF))
                             }
                         }
-                    ) { Text("创建") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
+                    }
                 }
-            )
+            }
         }
 
         if (renameTarget != null) {
