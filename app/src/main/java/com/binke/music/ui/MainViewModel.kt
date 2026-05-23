@@ -166,6 +166,8 @@ class MainViewModel(
 
     fun loadHomeData() {
         viewModelScope.launch {
+            // 启动直接进音乐页，避免先闪推荐页
+            setTab(1)
             _isLoadingHome.value = true
             try {
                 _recommendPlaylists.value = withContext(Dispatchers.IO) {
