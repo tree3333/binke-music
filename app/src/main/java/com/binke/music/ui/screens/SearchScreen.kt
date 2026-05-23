@@ -128,16 +128,22 @@ fun SearchScreen(
 
                 Spacer(modifier = Modifier.width(12.xdp(sx)))
 
-                Button(
-                    onClick = { onSearch(inputText) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6B5BFF),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(28.sdp(su)),
-                    modifier = Modifier.width(180.xdp(sx)).height(56.ydp(sy))
+                Box(
+                    modifier = Modifier
+                        .width(180.xdp(sx))
+                        .height(56.ydp(sy))
+                        .clip(RoundedCornerShape(28.sdp(su)))
+                        .background(Color(0xFF6B5BFF))
+                        .clickable { onSearch(inputText) },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("搜索", fontSize = (27 * su).sp, color = Color.White)
+                    Text(
+                        text = "搜索",
+                        color = Color.White,
+                        fontSize = (27 * su).sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
                 }
             }
 
