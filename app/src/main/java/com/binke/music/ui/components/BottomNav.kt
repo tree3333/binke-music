@@ -56,13 +56,14 @@ fun BottomNav(
             .fillMaxWidth()
             .height(140.ydp(sy))
             .background(Color(0xFF161616)),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         navItems.forEachIndexed { index, item ->
             val selected = currentTab == index
             Column(
                 modifier = Modifier
+                    .weight(1f)
                     .clickable { onTabSelected(index) }
                     .padding(horizontal = 24.xdp(sx)),
                 horizontalAlignment = Alignment.CenterHorizontally,
