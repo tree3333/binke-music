@@ -66,6 +66,33 @@ class PlaybackService : MediaSessionService() {
         return mediaSession
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 当系统通过 MEDIA_BUTTON action 直接拉起服务时，
+        // 事件不走 MediaSession.Callback，在这里手工处理
+        if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
+            val keyEvent = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+            if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                val cb = BinkeMediaCallbacks.callback
+                if (cb != null) {
+                    when (keyEvent.keyCode) {
+                        KeyEvent.KEYCODE_MEDIA_PLAY,
+                        KeyEvent.KEYCODE_MEDIA_PAUSE,
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                        KeyEvent.KEYCODE_HEADSETHOOK -> cb.onMediaPlay()
+                        KeyEvent.KEYCODE_MEDIA_NEXT,
+                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> cb.onMediaNext()
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                        KeyEvent.KEYCODE_MEDIA_REWIND -> cb.onMediaPrevious()
+                        KeyEvent.KEYCODE_MEDIA_STOP -> cb.onMediaStop()
+                    }
+                }
+            }
+            // 消费事件，不重启 service
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onDestroy() {
         mediaSession?.run {
             // 只 release 自己创建的 player；借来的 MusicPlayer 的 ExoPlayer 绝对不能 release
