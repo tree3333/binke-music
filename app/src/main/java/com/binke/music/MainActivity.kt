@@ -67,6 +67,7 @@ import com.binke.music.player.PlaybackService
 import com.binke.music.ui.MainViewModel
 import com.binke.music.ui.MainViewModelFactory
 import com.binke.music.ui.PlaylistDrawer
+import com.binke.music.ui.components.BottomNav
 import com.binke.music.ui.components.TopBar
 import com.binke.music.ui.screens.HomeScreen
 import com.binke.music.ui.screens.MineScreen
@@ -238,6 +239,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val playbackError by viewModel.playbackError.collectAsState()
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
 
+    val cfg = LocalConfiguration.current
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
+
     val isFavorite = currentSong?.let { viewModel.isFavorite(it.id) } ?: false
 
     Box(
@@ -246,11 +250,14 @@ fun MainScreen(viewModel: MainViewModel) {
             .background(Color(0xFF121212))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(
-                currentTab = currentTab,
-                onTabSelected = { viewModel.setTab(it) },
-                onSearchClick = { viewModel.navigateTo(Page.SEARCH) }
-            )
+            // 横屏用顶部栏，竖屏用底部栏
+            if (!isPortrait) {
+                TopBar(
+                    currentTab = currentTab,
+                    onTabSelected = { viewModel.setTab(it) },
+                    onSearchClick = { viewModel.navigateTo(Page.SEARCH) }
+                )
+            }
 
             Box(
                 modifier = Modifier
@@ -322,6 +329,14 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     Page.PLAYLIST_DETAIL -> Unit
                 }
+            }
+
+            // 竖屏底部导航
+            if (isPortrait) {
+                BottomNav(
+                    currentTab = currentTab,
+                    onTabSelected = { viewModel.setTab(it) }
+                )
             }
         }
 

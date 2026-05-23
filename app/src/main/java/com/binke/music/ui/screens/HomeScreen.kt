@@ -109,8 +109,12 @@ private fun PlaylistGrid(
     sy: Float,
     su: Float
 ) {
+    val cfg = LocalConfiguration.current
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
+    val columns = if (isPortrait) 3 else 4
+
     Column(verticalArrangement = Arrangement.spacedBy(18.ydp(sy))) {
-        playlists.chunked(4).forEach { row ->
+        playlists.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(18.xdp(sx))) {
                 row.forEach { playlist ->
                     PlaylistCard(
@@ -121,7 +125,7 @@ private fun PlaylistGrid(
                         su = su
                     )
                 }
-                repeat(4 - row.size) {
+                repeat(columns - row.size) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }

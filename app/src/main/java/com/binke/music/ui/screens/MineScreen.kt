@@ -118,6 +118,8 @@ fun MineScreen(
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
+    val columns = if (isPortrait) 3 else 4
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
@@ -138,7 +140,7 @@ fun MineScreen(
             .padding(24.sdp(su))
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Fixed(columns),
             horizontalArrangement = Arrangement.spacedBy(18.xdp(sx)),
             verticalArrangement = Arrangement.spacedBy(18.ydp(sy)),
             modifier = Modifier.fillMaxSize()

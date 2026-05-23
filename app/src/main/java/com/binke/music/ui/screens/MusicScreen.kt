@@ -2,6 +2,7 @@ package com.binke.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -103,30 +104,336 @@ fun MusicScreen(
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
 
     var swipeOffset by remember { mutableFloatStateOf(0f) }
     var isSwiping by remember { mutableStateOf(false) }
 
+    if (isPortrait) {
+        // 竖屏布局：封面/歌词可切换 + 控制区
+        PortraitMusicScreen(
+            song = song,
+            isPlaying = isPlaying,
+            currentPosition = currentPosition,
+            duration = duration,
+            playMode = playMode,
+            lyrics = lyrics,
+            isFavorite = isFavorite,
+            isLoading = isLoading,
+            onPlayPause = onPlayPause,
+            onPrevious = onPrevious,
+            onNext = onNext,
+            onTogglePlayMode = onTogglePlayMode,
+            onToggleFavorite = onToggleFavorite,
+            onOpenQueue = onOpenQueue,
+            onAddToPlaylist = onAddToPlaylist,
+            onSeek = onSeek,
+            onLyricSeekToLine = onLyricSeekToLine,
+            sx = sx, sy = sy, su = su
+        )
+    } else {
+        // 横屏布局：原有双栏
+        LandscapeMusicScreen(
+            song = song,
+            isPlaying = isPlaying,
+            currentPosition = currentPosition,
+            duration = duration,
+            playMode = playMode,
+            lyrics = lyrics,
+            isFavorite = isFavorite,
+            isLoading = isLoading,
+            onPlayPause = onPlayPause,
+            onPrevious = onPrevious,
+            onNext = onNext,
+            onTogglePlayMode = onTogglePlayMode,
+            onToggleFavorite = onToggleFavorite,
+            onOpenQueue = onOpenQueue,
+            onAddToPlaylist = onAddToPlaylist,
+            onSeek = onSeek,
+            onLyricSeekToLine = onLyricSeekToLine,
+            sx = sx, sy = sy, su = su,
+            swipeOffset = swipeOffset,
+            isSwiping = isSwiping,
+            onSwipeOffsetChange = { swipeOffset = it },
+            onIsSwipingChange = { isSwiping = it }
+        )
+    }
+}
+
+@Composable
+private fun PortraitMusicScreen(
+    song: Song?,
+    isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    playMode: PlayMode,
+    lyrics: List<LrcLine>,
+    isFavorite: Boolean,
+    isLoading: Boolean,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onTogglePlayMode: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onLyricSeekToLine: (Int) -> Unit,
+    sx: Float, sy: Float, su: Float
+) {
+    var showLyrics by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF121212))
+            .padding(horizontal = 24.xdp(sx)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 封面/歌词切换区
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = 16.ydp(sy)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (song == null) {
+                Text("暂无播放内容", color = Color.Gray, fontSize = (24 * su).sp)
+            } else if (showLyrics) {
+                LyricsView(
+                    sy = sy, su = su,
+                    lyrics = lyrics,
+                    currentPosition = currentPosition,
+                    onLineClick = onLyricSeekToLine
+                )
+            } else {
+                AsyncImage(
+                    model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
+                    contentDescription = "专辑封面",
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(16.sdp(su)))
+                        .clickable { showLyrics = true },
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+
+        // 歌曲信息
+        if (song != null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = song.name,
+                    color = Color.White,
+                    fontSize = (28 * su).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.ydp(sy)))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = song.quality,
+                        color = Color(0xFF9FA8FF),
+                        fontSize = (20 * su).sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(8.xdp(sx)))
+                    Text(
+                        text = song.artist,
+                        color = Color(0xFFBDBDBD),
+                        fontSize = (22 * su).sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.ydp(sy)))
+
+            // 进度条
+            Slider(
+                value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                onValueChange = { onSeek((it * duration).toLong()) },
+                colors = SliderDefaults.colors(
+                    thumbColor = Color(0xFF7B6DFF),
+                    activeTrackColor = Color(0xFF7B6DFF),
+                    inactiveTrackColor = Color(0xFF404040)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = (18 * su).sp)
+                Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = (18 * su).sp)
+            }
+
+            Spacer(modifier = Modifier.height(16.ydp(sy)))
+
+            // 控制按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onTogglePlayMode, modifier = Modifier.size(48.sdp(su))) {
+                    Icon(
+                        imageVector = when (playMode) {
+                            PlayMode.LIST_LOOP -> Icons.Filled.Repeat
+                            PlayMode.SINGLE_LOOP -> Icons.Filled.RepeatOne
+                            PlayMode.SHUFFLE -> Icons.Filled.Shuffle
+                        },
+                        contentDescription = "循环模式",
+                        tint = Color.White,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                IconButton(onClick = onPrevious, modifier = Modifier.size(56.sdp(su))) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipPrevious,
+                        contentDescription = "上一首",
+                        tint = Color.White,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(64.sdp(su))
+                        .clip(CircleShape)
+                        .background(Color(0xFF7B6DFF)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(28.sdp(su)),
+                            strokeWidth = 3.sdp(su)
+                        )
+                    } else {
+                        IconButton(onClick = onPlayPause, modifier = Modifier.size(48.sdp(su))) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "暂停" else "播放",
+                                tint = Color.White,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+
+                IconButton(onClick = onNext, modifier = Modifier.size(56.sdp(su))) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = "下一首",
+                        tint = Color.White,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                IconButton(onClick = onOpenQueue, modifier = Modifier.size(48.sdp(su))) {
+                    Icon(
+                        imageVector = Icons.Filled.QueueMusic,
+                        contentDescription = "播放列表",
+                        tint = Color.White,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.ydp(sy)))
+
+            // 收藏/加歌单/歌词切换
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                IconButton(onClick = onAddToPlaylist, modifier = Modifier.size(44.sdp(su))) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "加入歌单",
+                        tint = Color(0xFF9FA8FF),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(44.sdp(su))) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = "收藏",
+                        tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                IconButton(
+                    onClick = { showLyrics = !showLyrics },
+                    modifier = Modifier.size(44.sdp(su))
+                ) {
+                    Text(
+                        text = if (showLyrics) "封面" else "歌词",
+                        color = Color(0xFF9FA8FF),
+                        fontSize = (18 * su).sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.ydp(sy)))
+        }
+    }
+}
+
+@Composable
+private fun LandscapeMusicScreen(
+    song: Song?,
+    isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    playMode: PlayMode,
+    lyrics: List<LrcLine>,
+    isFavorite: Boolean,
+    isLoading: Boolean,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onTogglePlayMode: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onLyricSeekToLine: (Int) -> Unit,
+    sx: Float, sy: Float, su: Float,
+    swipeOffset: Float,
+    isSwiping: Boolean,
+    onSwipeOffsetChange: (Float) -> Unit,
+    onIsSwipingChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF121212))
             .pointerInput(song?.id) {
                 detectVerticalDragGestures(
-                    onDragStart = { isSwiping = true },
+                    onDragStart = { onIsSwipingChange(true) },
                     onDragEnd = {
-                        isSwiping = false
+                        onIsSwipingChange(false)
                         when {
                             swipeOffset < -120 * sy -> onNext()
                             swipeOffset > 120 * sy -> onPrevious()
                         }
-                        swipeOffset = 0f
+                        onSwipeOffsetChange(0f)
                     },
                     onDragCancel = {
-                        isSwiping = false
-                        swipeOffset = 0f
+                        onIsSwipingChange(false)
+                        onSwipeOffsetChange(0f)
                     },
-                    onVerticalDrag = { _, dragAmount -> swipeOffset += dragAmount }
+                    onVerticalDrag = { _, dragAmount -> onSwipeOffsetChange(swipeOffset + dragAmount) }
                 )
             }
     ) {
@@ -140,7 +447,7 @@ fun MusicScreen(
                     )
                 )
                 .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
-                .padding(top = 0.ydp(sy))   // ← 整体上移60dp（再下移10dp抵消）
+                .padding(top = 0.ydp(sy))
         ) {
             if (song == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

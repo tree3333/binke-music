@@ -22,7 +22,6 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true"
-            android:screenOrientation="landscape"
             android:launchMode="singleTop"
             android:theme="@style/Theme.BinkeMusic">
             <intent-filter>
