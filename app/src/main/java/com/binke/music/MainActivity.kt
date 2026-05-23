@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -254,6 +255,9 @@ fun MainScreen(viewModel: MainViewModel) {
             // 竖屏时搜索栏放最上面（可点击输入，不再跳转新页面）
             if (isPortrait) {
                 var searchInput by remember { mutableStateOf("") }
+                LaunchedEffect(searchQuery) {
+                    if (searchQuery.isEmpty()) searchInput = ""
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -269,7 +273,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             .padding(horizontal = 16.xdp(sx)),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "搜索",
@@ -277,17 +281,14 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.size(24.sdp(su))
                             )
                             Spacer(modifier = Modifier.width(8.xdp(sx)))
-                        BasicTextField(
-                            value = searchInput,
-                            onValueChange = {
-                                searchInput = it
-                                viewModel.updateSearchQuery(it)
-                                if (it.isNotBlank()) {
-                                    viewModel.navigateTo(Page.SEARCH)
-                                }
-                            },
+                            BasicTextField(
+                                value = searchInput,
+                                onValueChange = {
+                                    searchInput = it
+                                    viewModel.updateSearchQuery(it)
+                                },
                                 textStyle = TextStyle(color = Color.White, fontSize = (18 * su).sp),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 decorationBox = { innerTextField ->
                                     if (searchInput.isEmpty()) {
@@ -296,6 +297,24 @@ fun MainScreen(viewModel: MainViewModel) {
                                     innerTextField()
                                 }
                             )
+                            if (searchInput.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(4.xdp(sx)))
+                                IconButton(
+                                    onClick = {
+                                        searchInput = ""
+                                        viewModel.updateSearchQuery("")
+                                        viewModel.navigateTo(Page.HOME)
+                                    },
+                                    modifier = Modifier.size(28.sdp(su))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = "清除",
+                                        tint = Color(0xFF8E8E93),
+                                        modifier = Modifier.size(20.sdp(su))
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(8.xdp(sx)))
@@ -338,15 +357,30 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
             ) {
-                when (currentPage) {
-                    Page.HOME -> HomeScreen(
+                when {
+                    isPortrait && searchQuery.isNotEmpty() -> SearchScreen(
+                        query = searchQuery,
+                        searchResults = searchResults,
+                        suggestions = suggestions,
+                        searchHistory = searchHistory,
+                        isSearching = isSearching,
+                        onQueryChange = { viewModel.updateSearchQuery(it) },
+                        onSearch = { viewModel.search(it) },
+                        onSongClick = { viewModel.playSong(it) },
+                        onBack = {
+                            viewModel.updateSearchQuery("")
+                            viewModel.navigateTo(Page.HOME)
+                        }
+                    )
+
+                    currentPage == Page.HOME -> HomeScreen(
                         recommendPlaylists = recommendPlaylists,
                         bangPlaylists = bangPlaylists,
                         isLoading = isLoadingHome,
                         onPlaylistClick = { viewModel.openPlaylistDetail(it) }
                     )
 
-                    Page.MUSIC -> MusicScreen(
+                    currentPage == Page.MUSIC -> MusicScreen(
                         song = currentSong,
                         isPlaying = isPlaying,
                         currentPosition = currentPosition,
@@ -366,7 +400,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onLyricSeekToLine = { viewModel.seekToLyricIndex(it) }
                     )
 
-                    Page.MINE -> MineScreen(
+                    currentPage == Page.MINE -> MineScreen(
                         favorites = favorites,
                         history = history,
                         customPlaylists = customPlaylists,
@@ -378,7 +412,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onRenamePlaylist = { id, name -> viewModel.renamePlaylist(id, name) }
                     )
 
-                    Page.SEARCH -> SearchScreen(
+                    currentPage == Page.SEARCH -> SearchScreen(
                         query = searchQuery,
                         searchResults = searchResults,
                         suggestions = suggestions,
@@ -390,7 +424,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onBack = { viewModel.navigateTo(Page.HOME) }
                     )
 
-                    Page.PLAYLIST_DETAIL -> Unit
+                    currentPage == Page.PLAYLIST_DETAIL -> Unit
                 }
             }
 
