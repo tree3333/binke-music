@@ -451,11 +451,12 @@ private fun LandscapeMusicScreen(
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val coverScale = 1f + (abs(swipeOffset) / 300f).coerceAtMost(0.15f).let { if (swipeOffset < 0) 1f - it else 1f + it }
                     AsyncImage(
                         model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
                         contentDescription = "专辑封面",
                         modifier = Modifier
-                            .size(432.sdp(su))
+                            .size((432.sdp(su).value * coverScale).dp)
                             .clip(RoundedCornerShape(24.sdp(su))),
                         contentScale = ContentScale.Crop
                     )
