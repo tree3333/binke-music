@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -179,9 +178,7 @@ fun MineScreen(
                                 focusedPlaceholderColor = Color(0xFF8E8E93),
                                 unfocusedPlaceholderColor = Color(0xFF8E8E93)
                             ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 112.ydp(sy))
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.weight(1f))
                         Row(
