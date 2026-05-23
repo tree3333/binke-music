@@ -72,12 +72,12 @@ fun BottomNav(
                     imageVector = item.icon,
                     contentDescription = item.label,
                     tint = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
-                    modifier = Modifier.size(80.sdp(su))
+                    modifier = Modifier.size((80 * 0.8f).toInt().sdp(su))
                 )
                 Text(
                     text = item.label,
                     color = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
-                    fontSize = (40 * su).sp
+                    fontSize = (40 * su * 0.8f).sp
                 )
             }
         }
