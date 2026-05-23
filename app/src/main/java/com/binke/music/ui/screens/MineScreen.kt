@@ -154,7 +154,16 @@ fun MineScreen(
                             placeholder = { Text("歌单名称", fontSize = (32 * su).sp, color = Color(0xFF8E8E93)) },
                             singleLine = true,
                             textStyle = TextStyle(fontSize = (32 * su).sp, color = Color.White),
-                            modifier = Modifier.fillMaxWidth().height(88.ydp(sy))
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF8B7DFF),
+                                unfocusedBorderColor = Color(0xFF5A5A60),
+                                cursorColor = Color.White,
+                                focusedPlaceholderColor = Color(0xFF8E8E93),
+                                unfocusedPlaceholderColor = Color(0xFF8E8E93)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(96.ydp(sy))
                         )
                         Spacer(Modifier.weight(1f))
                         Row(
@@ -163,7 +172,13 @@ fun MineScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { showCreateDialog = false }) {
+                            TextButton(
+                                onClick = { showCreateDialog = false },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = 12.xdp(sx),
+                                    vertical = 10.ydp(sy)
+                                )
+                            ) {
                                 Text(
                                     "取消",
                                     fontSize = (28 * su).sp,
@@ -178,7 +193,11 @@ fun MineScreen(
                                         newPlaylistName = ""
                                         showCreateDialog = false
                                     }
-                                }
+                                },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = 12.xdp(sx),
+                                    vertical = 10.ydp(sy)
+                                )
                             ) {
                                 Text(
                                     "创建",
