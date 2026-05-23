@@ -28,6 +28,16 @@
             </intent-filter>
         </activity>
 
+        <!-- 拦截 MEDIA_BUTTON 广播并转发给 PlaybackService，设高优先级确保先于其他 receiver 收到 -->
+        <receiver
+            android:name=".player.MediaButtonReceiver"
+            android:exported="true"
+            android:priority="999">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
         <!-- MediaSession Service：注册后系统媒体按钮会路由到此处 -->
         <!-- 必须同时注册旧版 action (androidx.media)，legacy MediaButtonReceiver 只能找到旧版 -->
         <service
