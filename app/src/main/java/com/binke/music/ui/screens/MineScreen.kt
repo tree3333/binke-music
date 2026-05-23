@@ -34,7 +34,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,13 +42,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
+
+private const val BASE_WIDTH_DP = 1920f
+private const val BASE_HEIGHT_DP = 1080f
+
+private fun Int.xdp(sx: Float): Dp = (this * sx).dp
+private fun Int.ydp(sy: Float): Dp = (this * sy).dp
+private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @Composable
 fun MineScreen(
@@ -63,6 +72,11 @@ fun MineScreen(
     onDeletePlaylist: (String) -> Unit,
     onRenamePlaylist: (String, String) -> Unit
 ) {
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var deleteMode by remember { mutableStateOf(false) }
@@ -79,74 +93,76 @@ fun MineScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF121212))
-            .padding(24.dp)
+            .padding(24.sdp(su))
     ) {
         LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(tiles) { playlist ->
-                    PlaylistTile(
-                        playlist = playlist,
-                        isSystem = playlist.id == "favorites" || playlist.id == "history",
-                        deleteMode = deleteMode,
-                        onClick = {
-                            when (playlist.id) {
-                                "favorites" -> onPlayFavorites()
-                                "history" -> onPlayHistory()
-                                else -> onPlayCustomPlaylist(playlist)
-                            }
-                        },
-                        onLongPress = {
-                            if (playlist.id != "favorites" && playlist.id != "history") {
-                                deleteMode = true
-                            }
-                        },
-                        onDelete = { onDeletePlaylist(playlist.id) },
-                        onRename = {
-                            if (playlist.id != "favorites" && playlist.id != "history") {
-                                renameTarget = playlist
-                                renameText = playlist.name
-                            }
+            columns = GridCells.Fixed(4),
+            horizontalArrangement = Arrangement.spacedBy(18.xdp(sx)),
+            verticalArrangement = Arrangement.spacedBy(18.ydp(sy)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(tiles) { playlist ->
+                PlaylistTile(
+                    playlist = playlist,
+                    isSystem = playlist.id == "favorites" || playlist.id == "history",
+                    deleteMode = deleteMode,
+                    onClick = {
+                        when (playlist.id) {
+                            "favorites" -> onPlayFavorites()
+                            "history" -> onPlayHistory()
+                            else -> onPlayCustomPlaylist(playlist)
                         }
-                    )
-                }
-                item {
-                    AddPlaylistTile { showCreateDialog = true }
-                }
+                    },
+                    onLongPress = {
+                        if (playlist.id != "favorites" && playlist.id != "history") {
+                            deleteMode = true
+                        }
+                    },
+                    onDelete = { onDeletePlaylist(playlist.id) },
+                    onRename = {
+                        if (playlist.id != "favorites" && playlist.id != "history") {
+                            renameTarget = playlist
+                            renameText = playlist.name
+                        }
+                    },
+                    sy = sy,
+                    su = su
+                )
             }
+            item {
+                AddPlaylistTile(onClick = { showCreateDialog = true }, sy = sy, su = su)
+            }
+        }
 
         if (showCreateDialog) {
             Dialog(onDismissRequest = { showCreateDialog = false }) {
                 Surface(
-                    modifier = Modifier.size(560.dp, 320.dp),
-                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.size(560.xdp(sx), 320.ydp(sy)),
+                    shape = RoundedCornerShape(24.sdp(su)),
                     color = Color(0xFF1C1C1E)
                 ) {
                     Column(
-                        modifier = Modifier.padding(40.dp),
+                        modifier = Modifier.padding(40.sdp(su)),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(28.dp)
+                        verticalArrangement = Arrangement.spacedBy(28.ydp(sy))
                     ) {
-                        Text("新建歌单", fontSize = 40.sp, color = Color.White)
+                        Text("新建歌单", fontSize = (40 * su).sp, color = Color.White)
                         OutlinedTextField(
                             value = newPlaylistName,
                             onValueChange = { newPlaylistName = it },
-                            placeholder = { Text("歌单名称", fontSize = 32.sp) },
+                            placeholder = { Text("歌单名称", fontSize = (32 * su).sp) },
                             singleLine = true,
-                            textStyle = TextStyle(fontSize = 32.sp),
-                            modifier = Modifier.fillMaxWidth().height(80.dp)
+                            textStyle = TextStyle(fontSize = (32 * su).sp),
+                            modifier = Modifier.fillMaxWidth().height(80.ydp(sy))
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.xdp(sx)),
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = { showCreateDialog = false }) {
-                                Text("取消", fontSize = 28.sp, color = Color(0xFF8E8E93))
+                                Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
                             }
                             TextButton(
                                 onClick = {
@@ -157,7 +173,7 @@ fun MineScreen(
                                     }
                                 }
                             ) {
-                                Text("创建", fontSize = 28.sp, color = Color(0xFF0A84FF))
+                                Text("创建", fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
                             }
                         }
                     }
@@ -168,12 +184,15 @@ fun MineScreen(
         if (renameTarget != null) {
             AlertDialog(
                 onDismissRequest = { renameTarget = null },
-                title = { Text("重命名歌单") },
+                modifier = Modifier.padding(40.sdp(su)),
+                title = { Text("重命名歌单", fontSize = (36 * su).sp) },
                 text = {
                     OutlinedTextField(
                         value = renameText,
                         onValueChange = { renameText = it },
-                        singleLine = true
+                        singleLine = true,
+                        textStyle = TextStyle(fontSize = (28 * su).sp),
+                        placeholder = { Text("歌单名称", fontSize = (28 * su).sp) }
                     )
                 },
                 confirmButton = {
@@ -185,10 +204,10 @@ fun MineScreen(
                             }
                             renameTarget = null
                         }
-                    ) { Text("保存") }
+                    ) { Text("保存", fontSize = (28 * su).sp) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { renameTarget = null }) { Text("取消") }
+                    TextButton(onClick = { renameTarget = null }) { Text("取消", fontSize = (28 * su).sp) }
                 }
             )
         }
@@ -204,14 +223,16 @@ private fun PlaylistTile(
     onClick: () -> Unit,
     onLongPress: () -> Unit,
     onDelete: () -> Unit,
-    onRename: () -> Unit
+    onRename: () -> Unit,
+    sy: Float,
+    su: Float
 ) {
     Box {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(18.sdp(su)))
                 .background(Color(0xFF1B1B1F))
                 .combinedClickable(
                     onClick = onClick,
@@ -220,13 +241,13 @@ private fun PlaylistTile(
                         if (!isSystem) onRename()
                     }
                 )
-                .padding(16.dp)
+                .padding(16.sdp(su))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.sdp(su)))
                     .background(Color(0xFF2A2A31)),
                 contentAlignment = Alignment.Center
             ) {
@@ -238,23 +259,23 @@ private fun PlaylistTile(
                     },
                     contentDescription = null,
                     tint = Color(0xFF7B6DFF),
-                    modifier = Modifier.size(144.dp)
+                    modifier = Modifier.size(144.sdp(su))
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.ydp(sy)))
             Text(
                 text = playlist.name,
                 color = Color.White,
-                fontSize = 36.sp,
+                fontSize = (36 * su).sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.ydp(sy)))
             Text(
                 text = "${playlist.total}首",
                 color = Color(0xFF8E8E93),
-                fontSize = 26.sp
+                fontSize = (26 * su).sp
             )
         }
 
@@ -263,12 +284,12 @@ private fun PlaylistTile(
                 onClick = onDelete,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(60.dp)
+                    .padding(8.sdp(su))
+                    .size(60.sdp(su))
                     .clip(CircleShape)
                     .background(Color.Red)
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(36.dp))
+                Icon(Icons.Filled.Close, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(36.sdp(su)))
             }
         }
     }
@@ -276,12 +297,12 @@ private fun PlaylistTile(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AddPlaylistTile(onClick: () -> Unit) {
+private fun AddPlaylistTile(onClick: () -> Unit, sy: Float, su: Float) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.sdp(su)))
             .background(Color(0xFF1B1B1F))
             .combinedClickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -291,10 +312,10 @@ private fun AddPlaylistTile(onClick: () -> Unit) {
                 imageVector = Icons.Filled.Add,
                 contentDescription = "新建歌单",
                 tint = Color(0xFF7B6DFF),
-                modifier = Modifier.size(140.dp)
+                modifier = Modifier.size(140.sdp(su))
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("新增歌单", color = Color.White, fontSize = 32.sp)
+            Spacer(modifier = Modifier.height(16.ydp(sy)))
+            Text("新增歌单", color = Color.White, fontSize = (32 * su).sp)
         }
     }
 }
