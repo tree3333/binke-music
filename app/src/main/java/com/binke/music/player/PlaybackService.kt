@@ -20,6 +20,8 @@ import com.binke.music.MainActivity
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    /** true = 用的是 service 自己 new 的 ExoPlayer，onDestroy 必须 release；false = 借的 MusicPlayer 的，不能 release */
+    private var serviceOwnsPlayer = false
 
     private val player: ExoPlayer by lazy {
         val audioAttributes = AudioAttributes.Builder()
@@ -47,13 +49,14 @@ class PlaybackService : MediaSessionService() {
                 null
             }
             val activePlayer = sharedPlayer ?: player
+            serviceOwnsPlayer = sharedPlayer == null
 
             mediaSession = MediaSession.Builder(this, activePlayer)
                 .setSessionActivity(createPendingIntent())
                 .setCallback(MediaButtonCallback())
                 .build()
 
-            Log.d(TAG, "MediaSession created, player=${if (sharedPlayer != null) "shared" else "local"}")
+            Log.d(TAG, "MediaSession created, player=${if (sharedPlayer != null) "shared" else "local"}, owns=$serviceOwnsPlayer")
         } catch (e: Exception) {
             Log.e(TAG, "PlaybackService.onCreate failed", e)
         }
@@ -65,7 +68,13 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.run {
-            player.release()
+            // 只 release 自己创建的 player；借来的 MusicPlayer 的 ExoPlayer 绝对不能 release
+            if (serviceOwnsPlayer) {
+                player.release()
+                Log.d(TAG, "released service-owned player")
+            } else {
+                Log.d(TAG, "shared player, not releasing from service")
+            }
             release()
         }
         mediaSession = null
