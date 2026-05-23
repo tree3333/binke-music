@@ -74,8 +74,10 @@ private fun CompactDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
+        val cfg = LocalConfiguration.current
+        val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
         Surface(
-            modifier = Modifier.width(620.xdp(sx)),
+            modifier = Modifier.width(if (isPortrait) cfg.screenWidthDp.dp * 0.85f else 620.xdp(sx)),
             shape = RoundedCornerShape(24.sdp(su)),
             color = Color(0xFF1C1C1E)
         ) {

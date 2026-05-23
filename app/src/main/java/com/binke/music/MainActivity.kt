@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import com.binke.music.data.model.Page
@@ -136,6 +137,7 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val app = application as BinkeMusicApp
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
@@ -244,7 +246,11 @@ fun MainScreen(viewModel: MainViewModel) {
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             // 竖屏时搜索栏放最上面（可点击输入，不再跳转新页面）
             if (isPortrait) {
                 var searchInput by remember { mutableStateOf("") }
@@ -271,12 +277,15 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.size(24.sdp(su))
                             )
                             Spacer(modifier = Modifier.width(8.xdp(sx)))
-                            BasicTextField(
-                                value = searchInput,
-                                onValueChange = {
-                                    searchInput = it
-                                    viewModel.updateSearchQuery(it)
-                                },
+                        BasicTextField(
+                            value = searchInput,
+                            onValueChange = {
+                                searchInput = it
+                                viewModel.updateSearchQuery(it)
+                                if (it.isNotBlank()) {
+                                    viewModel.navigateTo(Page.SEARCH)
+                                }
+                            },
                                 textStyle = TextStyle(color = Color.White, fontSize = (18 * su).sp),
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
@@ -292,14 +301,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     Spacer(modifier = Modifier.width(8.xdp(sx)))
                     Box(
                         modifier = Modifier
-                            .width(80.xdp(sx))
+                            .width(120.xdp(sx))
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(28.sdp(su)))
                             .background(Color(0xFF6B5BFF))
                             .clickable { viewModel.search(searchInput) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("搜索", color = Color.White, fontSize = (18 * su).sp, fontWeight = FontWeight.Bold)
+                        Text("搜索", color = Color.White, fontSize = (22 * su).sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -597,9 +606,6 @@ private fun AddToPlaylistDialog(
                     ),
                     shape = RoundedCornerShape(16.sdp(su))
                 ) {
-                    if (isInPlaylist) {
-                        Text("✓", fontSize = (34 * su).sp, color = Color(0xFF8B7DFF), modifier = Modifier.padding(end = 8.xdp(sx)))
-                    }
                     Text(
                         playlist.name,
                         fontSize = (28 * su).sp,
@@ -609,6 +615,9 @@ private fun AddToPlaylistDialog(
                         modifier = Modifier.weight(1f),
                         softWrap = false
                     )
+                    if (isInPlaylist) {
+                        Text("✓", fontSize = (34 * su).sp, color = Color(0xFF8B7DFF), modifier = Modifier.padding(start = 8.xdp(sx)))
+                    }
                 }
             }
             if (playlists.isEmpty()) {
