@@ -56,16 +56,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import coil.compose.AsyncImage
 import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
 import com.binke.music.data.model.Song
 import kotlin.math.abs
+
+private const val BASE_WIDTH_DP = 1920f
+private const val BASE_HEIGHT_DP = 1080f
+
+private fun Int.xdp(sx: Float): Dp = (this * sx).dp
+private fun Int.ydp(sy: Float): Dp = (this * sy).dp
+private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -88,6 +99,11 @@ fun MusicScreen(
     onSeek: (Long) -> Unit,
     onLyricSeekToLine: (Int) -> Unit
 ) {
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+
     var swipeOffset by remember { mutableFloatStateOf(0f) }
     var isSwiping by remember { mutableStateOf(false) }
 
@@ -101,8 +117,8 @@ fun MusicScreen(
                     onDragEnd = {
                         isSwiping = false
                         when {
-                            swipeOffset < -120 -> onNext()
-                            swipeOffset > 120 -> onPrevious()
+                            swipeOffset < -120 * sy -> onNext()
+                            swipeOffset > 120 * sy -> onPrevious()
                         }
                         swipeOffset = 0f
                     },
@@ -123,12 +139,12 @@ fun MusicScreen(
                         listOf(Color(0xFF1A1A1A), Color(0xFF121212))
                     )
                 )
-                .padding(horizontal = 36.dp, vertical = 28.dp)
-                .padding(top = 0.dp)   // ← 整体上移60dp（再下移10dp抵消）
+                .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
+                .padding(top = 0.ydp(sy))   // ← 整体上移60dp（再下移10dp抵消）
         ) {
             if (song == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("暂无播放内容", color = Color.Gray, fontSize = 24.sp)
+                    Text("暂无播放内容", color = Color.Gray, fontSize = (24 * su).sp)
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -136,124 +152,139 @@ fun MusicScreen(
                         model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
                         contentDescription = "专辑封面",
                         modifier = Modifier
-                            .size(432.dp)
-                            .clip(RoundedCornerShape(24.dp)),
+                            .size(432.sdp(su))
+                            .clip(RoundedCornerShape(24.sdp(su))),
                         contentScale = ContentScale.Crop
                     )
 
-                    Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(modifier = Modifier.height(40.ydp(sy)))
 
-                    // 歌名品质歌手 + 右侧按钮：整体向中间对齐
-                    Row(
+                    ConstraintLayout(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 95.dp, end = 12.dp),   // ← 左对齐循环按钮
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(start = 36.xdp(sx), end = 36.xdp(sx))
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        val (
+                            titleBlock,
+                            addButton,
+                            favoriteButton,
+                            sliderRef,
+                            timeRowRef,
+                            playModeRef,
+                            previousRef,
+                            playRef,
+                            nextRef,
+                            queueRef
+                        ) = createRefs()
+
+                        Column(
+                            modifier = Modifier.constrainAs(titleBlock) {
+                                start.linkTo(parent.start)
+                                end.linkTo(addButton.start, margin = 24.xdp(sx))
+                                top.linkTo(parent.top)
+                                width = Dimension.fillToConstraints
+                            }
+                        ) {
                             Text(
                                 text = song.name,
                                 color = Color.White,
-                                fontSize = 30.sp,
+                                fontSize = (30 * su).sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(6.ydp(sy)))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = song.quality,
                                     color = Color(0xFF9FA8FF),
-                                    fontSize = 24.sp,
+                                    fontSize = (24 * su).sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(12.xdp(sx)))
                                 Text(
                                     text = song.artist,
                                     color = Color(0xFFBDBDBD),
-                                    fontSize = 27.sp,
+                                    fontSize = (27 * su).sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        // 加入歌单 + 收藏，与下方控制栏对齐
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        IconButton(
+                            onClick = onAddToPlaylist,
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(addButton) {
+                                    centerHorizontallyTo(nextRef)
+                                    centerVerticallyTo(titleBlock)
+                                }
                         ) {
-                            // 前3个位置占位，与循环/上一首/播放对齐
-                            Spacer(modifier = Modifier.size(68.dp))
-                            Spacer(modifier = Modifier.size(92.dp))
-                            Spacer(modifier = Modifier.size(82.dp))
-                            IconButton(
-                                onClick = onAddToPlaylist,
-                                modifier = Modifier
-                                    .size(82.dp)
-                                    .offset(x = (-161).dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Add,
-                                    contentDescription = "加入歌单",
-                                    tint = Color(0xFF9FA8FF),
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            IconButton(
-                                onClick = onToggleFavorite,
-                                modifier = Modifier
-                                    .size(82.dp)
-                                    .offset(x = (-76).dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    contentDescription = "收藏",
-                                    tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "加入歌单",
+                                tint = Color(0xFF9FA8FF),
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                        IconButton(
+                            onClick = onToggleFavorite,
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(favoriteButton) {
+                                    centerHorizontallyTo(queueRef)
+                                    centerVerticallyTo(titleBlock)
+                                }
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = "收藏",
+                                tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
 
-                    // 进度条：左对齐循环按钮，右对齐歌单按钮
-                    val leftAlign = 95.dp
-                    val rightAlign = 95.dp
-                    Slider(
-                        value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                        onValueChange = { onSeek((it * duration).toLong()) },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(0xFF7B6DFF),
-                            activeTrackColor = Color(0xFF7B6DFF),
-                            inactiveTrackColor = Color(0xFF404040)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = leftAlign, end = rightAlign)
-                    )
+                        Slider(
+                            value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                            onValueChange = { onSeek((it * duration).toLong()) },
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFF7B6DFF),
+                                activeTrackColor = Color(0xFF7B6DFF),
+                                inactiveTrackColor = Color(0xFF404040)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .constrainAs(sliderRef) {
+                                    top.linkTo(titleBlock.bottom, margin = 4.ydp(sy))
+                                    start.linkTo(parent.start)
+                                    end.linkTo(parent.end)
+                                    width = Dimension.fillToConstraints
+                                }
+                        )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = leftAlign, end = rightAlign),   // ← 同步移动
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = 22.sp)
-                        Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = 22.sp)
-                    }
+                        Row(
+                            modifier = Modifier.constrainAs(timeRowRef) {
+                                top.linkTo(sliderRef.bottom, margin = (-15).ydp(sy))
+                                start.linkTo(parent.start)
+                                end.linkTo(parent.end)
+                                width = Dimension.fillToConstraints
+                            },
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
+                            Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
+                        }
 
-                    Spacer(modifier = Modifier.height(22.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         IconButton(
                             onClick = onTogglePlayMode,
-                            modifier = Modifier.size(68.dp)
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(playModeRef) {
+                                    top.linkTo(timeRowRef.bottom, margin = 37.ydp(sy))
+                                    start.linkTo(parent.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = when (playMode) {
@@ -269,7 +300,13 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onPrevious,
-                            modifier = Modifier.size(92.dp)
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(previousRef) {
+                                    centerVerticallyTo(playModeRef)
+                                    start.linkTo(playModeRef.end)
+                                    end.linkTo(playRef.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SkipPrevious,
@@ -281,21 +318,25 @@ fun MusicScreen(
 
                         Box(
                             modifier = Modifier
-                                .size(82.dp)
+                                .size(82.sdp(su))
                                 .clip(CircleShape)
-                                .background(Color(0xFF7B6DFF)),
+                                .background(Color(0xFF7B6DFF))
+                                .constrainAs(playRef) {
+                                    centerHorizontallyTo(parent)
+                                    centerVerticallyTo(playModeRef)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     color = Color.White,
-                                    modifier = Modifier.size(34.dp),
-                                    strokeWidth = 3.dp
+                                    modifier = Modifier.size(34.sdp(su)),
+                                    strokeWidth = 3.sdp(su)
                                 )
                             } else {
                                 IconButton(
                                     onClick = onPlayPause,
-                                    modifier = Modifier.size(63.dp)
+                                    modifier = Modifier.size(63.sdp(su))
                                 ) {
                                     Icon(
                                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -309,7 +350,13 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onNext,
-                            modifier = Modifier.size(92.dp)
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(nextRef) {
+                                    centerVerticallyTo(playRef)
+                                    start.linkTo(playRef.end)
+                                    end.linkTo(queueRef.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SkipNext,
@@ -321,7 +368,12 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onOpenQueue,
-                            modifier = Modifier.size(68.dp)
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(queueRef) {
+                                    centerVerticallyTo(playRef)
+                                    end.linkTo(parent.end)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.QueueMusic,
@@ -340,26 +392,28 @@ fun MusicScreen(
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color(0xFF171717))
-                .padding(horizontal = 28.dp, vertical = 16.dp)
+                .padding(horizontal = 28.xdp(sx), vertical = 16.ydp(sy))
         ) {
             LyricsView(
+                sy = sy,
+                su = su,
                 lyrics = lyrics,
                 currentPosition = currentPosition,
                 onLineClick = onLyricSeekToLine
             )
 
-            if (isSwiping && abs(swipeOffset) > 50) {
+            if (isSwiping && abs(swipeOffset) > 50 * sy) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(18.sdp(su)))
                         .background(Color(0xAA000000))
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(horizontal = 24.xdp(sx), vertical = 16.ydp(sy))
                 ) {
                     Text(
                         text = if (swipeOffset < 0) "上滑切到下一首" else "下滑切到上一首",
                         color = Color.White,
-                        fontSize = 28.sp,
+                        fontSize = (28 * su).sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -371,6 +425,8 @@ fun MusicScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LyricsView(
+    sy: Float,
+    su: Float,
     lyrics: List<LrcLine>,
     currentPosition: Long,
     onLineClick: (Int) -> Unit
@@ -387,7 +443,7 @@ private fun LyricsView(
 
     if (lyrics.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("暂无歌词", color = Color(0xFF6E6E73), fontSize = 44.sp)
+            Text("暂无歌词", color = Color(0xFF6E6E73), fontSize = (44 * su).sp)
         }
         return
     }
@@ -395,23 +451,23 @@ private fun LyricsView(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(36.dp)
+        verticalArrangement = Arrangement.spacedBy(36.ydp(sy))
     ) {
         itemsIndexed(lyrics) { index, line ->
             val active = index == currentLineIndex
             Text(
                 text = line.text,
                 color = if (active) Color.White else Color(0xFF9A9A9F),
-                fontSize = if (active) 52.sp else 44.sp,
+                fontSize = if (active) (52 * su).sp else (44 * su).sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                lineHeight = if (active) 72.sp else 60.sp,
+                lineHeight = if (active) (72 * su).sp else (60 * su).sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClick = { onLineClick(index) })
             )
         }
-        item { Spacer(modifier = Modifier.height(80.dp)) }
+        item { Spacer(modifier = Modifier.height(80.ydp(sy))) }
     }
 }
 

@@ -599,6 +599,71 @@ class KuwoApiService {
     }
 
     /**
+     * 从网易云搜索封面：搜索 → 详情 → 取 album.picUrl
+     * 失败返回空字符串
+     */
+    fun getCoverFromNetEase(artist: String, name: String): String {
+        return try {
+            val query = URLEncoder.encode("${artist.trim()} ${name.trim()}", "UTF-8")
+            val searchUrl = "https://music.163.com/api/search/get"
+            val searchBody = "s=$query&type=1&limit=1&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
+            val searchRequest = Request.Builder()
+                .url(searchUrl)
+                .post(searchBody)
+                .addHeader("User-Agent", BROWSER_UA)
+                .addHeader("Referer", "https://music.163.com/")
+                .build()
+            val searchResp = browserClient.newCall(searchRequest).execute().use { it.body?.string() ?: "" }
+            val searchJson = JSONObject(searchResp)
+            val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return ""
+            if (songs.length() == 0) return ""
+            val songId = songs.getJSONObject(0).optString("id") ?: return ""
+
+            // 取 song detail 拿封面
+            val detailUrl = "https://music.163.com/api/v3/song/detail"
+            val detailBody = "c=[{\"id\":$songId}]".toRequestBody("application/x-www-form-urlencoded".toMediaType())
+            val detailRequest = Request.Builder()
+                .url(detailUrl)
+                .post(detailBody)
+                .addHeader("User-Agent", BROWSER_UA)
+                .addHeader("Referer", "https://music.163.com/")
+                .build()
+            val detailResp = browserClient.newCall(detailRequest).execute().use { it.body?.string() ?: "" }
+            val detailJson = JSONObject(detailResp)
+            val picUrl = detailJson.optJSONArray("songs")?.optJSONObject(0)
+                ?.optJSONObject("al")?.optString("picUrl", "") ?: ""
+            picUrl
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "getCoverFromNetEase error", e)
+            ""
+        }
+    }
+
+    /**
+     * 从 iTunes 搜索高清封面，失败返回空字符串
+     */
+    fun getCoverFromItunes(artist: String, name: String): String {
+        return try {
+            val query = URLEncoder.encode("${artist.trim()} ${name.trim()}", "UTF-8")
+            val url = "https://itunes.apple.com/search?term=$query&entity=song&limit=1&country=CN"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", BROWSER_UA)
+                .build()
+            val response = browserClient.newCall(request).execute().use { it.body?.string() ?: "" }
+            val json = JSONObject(response)
+            val results = json.optJSONArray("results") ?: return ""
+            if (results.length() == 0) return ""
+            val artwork = results.getJSONObject(0).optString("artworkUrl100", "")
+            if (artwork.isBlank()) return ""
+            // 把 100x100 换成 1000x1000 拿高清
+            artwork.replace("100x100bb", "1000x1000bb")
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "getCoverFromItunes error", e)
+            ""
+        }
+    }
+    /**
      * 获取排行榜
      */
     fun getBangMenu(): List<Playlist> {

@@ -21,14 +21,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,8 +39,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +52,13 @@ import coil.compose.AsyncImage
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import kotlin.math.roundToInt
+
+private const val BASE_WIDTH_DP = 1920f
+private const val BASE_HEIGHT_DP = 1080f
+
+private fun Int.xdp(sx: Float): Dp = (this * sx).dp
+private fun Int.ydp(sy: Float): Dp = (this * sy).dp
+private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @Composable
 fun PlaylistDrawer(
@@ -63,6 +70,11 @@ fun PlaylistDrawer(
     onSongClick: (Int) -> Unit
 ) {
     if (!isVisible || playlist == null) return
+
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
 
     var offsetX by remember { mutableFloatStateOf(0f) }
 
@@ -80,14 +92,14 @@ fun PlaylistDrawer(
 
             Box(
                 modifier = Modifier
-                    .width(778.dp)
+                    .width(778.xdp(sx))
                     .fillMaxHeight()
                     .offset { IntOffset(offsetX.roundToInt(), 0) }
                     .background(Color(0xFF171717))
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragEnd = {
-                                if (offsetX > 120f) {
+                                if (offsetX > 120f * sx) {
                                     onDismiss()
                                 }
                                 offsetX = 0f
@@ -97,7 +109,7 @@ fun PlaylistDrawer(
                             }
                         )
                     }
-                    .padding(20.dp)
+                    .padding(20.sdp(su))
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
@@ -108,44 +120,43 @@ fun PlaylistDrawer(
                             model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
                             contentDescription = null,
                             modifier = Modifier
-                                .size(160.dp)
-                                .clip(RoundedCornerShape(16.dp)),
+                                .size(160.sdp(su))
+                                .clip(RoundedCornerShape(16.sdp(su))),
                             contentScale = ContentScale.Crop
                         )
 
-                        Spacer(modifier = Modifier.width(18.dp))
+                        Spacer(modifier = Modifier.width(18.xdp(sx)))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = playlist.name,
                                 color = Color.White,
-                                fontSize = 52.sp,           // ← 26x2
+                                fontSize = (52 * su).sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.ydp(sy)))
                             Text(
                                 text = if (playlist.creator.isNotBlank()) "创建者：${playlist.creator}" else "${songs.size}首歌曲",
                                 color = Color(0xFFBDBDBD),
-                                fontSize = 32.sp            // ← 16x2
+                                fontSize = (32 * su).sp
                             )
                             if (playlist.description.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.ydp(sy)))
                                 Text(
                                     text = playlist.description,
                                     color = Color(0xFF8E8E93),
-                                    fontSize = 28.sp,       // ← 14x2
+                                    fontSize = (28 * su).sp,
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        // 右上角关闭按钮，大小与下一首按钮一致（92.dp）
                         IconButton(
                             onClick = onDismiss,
-                            modifier = Modifier.size(92.dp)
+                            modifier = Modifier.size(92.sdp(su))
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
@@ -156,29 +167,36 @@ fun PlaylistDrawer(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(18.ydp(sy)))
 
                     Button(
                         onClick = onPlayAll,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B5BFF)),
-                        shape = RoundedCornerShape(36.dp),   // ← 24x1.5
-                        modifier = Modifier.height(54.dp)    // ← 默认约36dp x1.5
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6B5BFF),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 20.xdp(sx),
+                            vertical = 8.ydp(sy)
+                        ),
+                        shape = RoundedCornerShape(36.sdp(su)),
+                        modifier = Modifier.height(64.ydp(sy))
                     ) {
-                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.dp))   // ← 22x1.5
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("播放全部", fontSize = 27.sp)    // ← 默认约18sp x1.5
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.sdp(su)))
+                        Spacer(modifier = Modifier.width(12.xdp(sx)))
+                        Text("播放全部", fontSize = (27 * su).sp, color = Color.White)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(14.ydp(sy)))
                     Divider(color = Color(0xFF303036))
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.ydp(sy)))
 
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.ydp(sy))
                     ) {
                         itemsIndexed(songs) { index, song ->
-                            SongListItem(song = song, onClick = { onSongClick(index) })
+                            SongListItem(song = song, onClick = { onSongClick(index) }, sx = sx, sy = sy, su = su)
                         }
                     }
                 }
@@ -188,41 +206,41 @@ fun PlaylistDrawer(
 }
 
 @Composable
-private fun SongListItem(song: Song, onClick: () -> Unit) {
+private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, su: Float) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.sdp(su)))
             .background(Color(0xFF222227))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(12.sdp(su)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
             model = song.pic.ifEmpty { "https://via.placeholder.com/80/171717/F1F1F1?text=BinKe" },
             contentDescription = null,
             modifier = Modifier
-                .size(72.dp)
-                .clip(RoundedCornerShape(10.dp)),
+                .size(72.sdp(su))
+                .clip(RoundedCornerShape(10.sdp(su))),
             contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(14.xdp(sx)))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.name,
                 color = Color.White,
-                fontSize = 34.sp,           // ← 17x2
+                fontSize = (34 * su).sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.ydp(sy)))
             Text(
                 text = "${song.artist} · ${song.quality}",
                 color = Color(0xFFBDBDBD),
-                fontSize = 28.sp,           // ← 14x2
+                fontSize = (28 * su).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -231,7 +249,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit) {
         Text(
             text = song.durationText,
             color = Color(0xFF8E8E93),
-            fontSize = 28.sp               // ← 14x2
+            fontSize = (28 * su).sp
         )
     }
 }

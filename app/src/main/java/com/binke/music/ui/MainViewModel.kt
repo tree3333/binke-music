@@ -14,6 +14,7 @@ import com.binke.music.player.MusicPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -212,8 +213,24 @@ class MainViewModel(
                 apiService.getPlaylistDetail(playlistId, rn = 100)
             }
             if (detail != null) {
-                _drawerPlaylist.value = detail
-                _drawerSongs.value = detail.musicList
+                // 封面增强：iTunes → 网易云 → 酷我兜底
+                val enhancedSongs = withContext(Dispatchers.IO) {
+                    detail.musicList.map { song ->
+                        async {
+                            if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                                // 1. 优先 iTunes
+                                val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                                if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
+                                // 2. 其次网易云
+                                val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                                if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
+                            }
+                            song
+                        }
+                    }.awaitAll()
+                }
+                _drawerPlaylist.value = detail.copy(musicList = enhancedSongs)
+                _drawerSongs.value = enhancedSongs
             }
         }
     }
@@ -615,7 +632,23 @@ class MainViewModel(
             val results = withContext(Dispatchers.IO) {
                 apiService.searchSongs(query)
             }
-            _searchResults.value = results
+            // 封面增强：iTunes → 网易云 → 酷我兜底
+            val enhanced = withContext(Dispatchers.IO) {
+                results.map { song ->
+                    async {
+                        if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                            // 1. 优先 iTunes
+                            val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                            if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
+                            // 2. 其次网易云
+                            val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                            if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
+                        }
+                        song
+                    }
+                }.awaitAll()
+            }
+            _searchResults.value = enhanced
         } finally {
             _isSearching.value = false
         }

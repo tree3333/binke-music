@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -33,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,13 +42,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -69,6 +73,55 @@ import com.binke.music.ui.screens.MineScreen
 import com.binke.music.ui.screens.MusicScreen
 import com.binke.music.ui.screens.SearchScreen
 
+private const val BASE_WIDTH_DP = 1920f
+private const val BASE_HEIGHT_DP = 1080f
+
+private fun Int.xdp(sx: Float): Dp = (this * sx).dp
+private fun Int.ydp(sy: Float): Dp = (this * sy).dp
+private fun Int.sdp(su: Float): Dp = (this * su).dp
+
+@Composable
+private fun CompactDialog(
+    title: String,
+    onDismissRequest: () -> Unit,
+    sx: Float,
+    sy: Float,
+    su: Float,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    dismissText: String = "取消",
+    onDismissClick: () -> Unit = onDismissRequest,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier.width(620.xdp(sx)),
+            shape = RoundedCornerShape(24.sdp(su)),
+            color = Color(0xFF1C1C1E)
+        ) {
+            Column(
+                modifier = Modifier.padding(36.sdp(su)),
+                verticalArrangement = Arrangement.spacedBy(20.ydp(sy))
+            ) {
+                Text(title, fontSize = (36 * su).sp, color = Color.White)
+                content()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissClick) {
+                        Text(dismissText, fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
+                    }
+                    TextButton(onClick = onConfirm) {
+                        Text(confirmText, fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
+                    }
+                }
+            }
+        }
+    }
+}
+
 class MainActivity : ComponentActivity(), MediaControllerCallback {
 
     private lateinit var viewModel: MainViewModel
@@ -88,10 +141,7 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
-        // 启动 PlaybackService，确保 MediaSession 始终存在，系统才知道彬可音乐是活跃媒体播放器
         startPlaybackService()
-
-        // 注册媒体按钮回调：方向盘/耳机等按钮事件会转发到 ViewModel
         BinkeMediaCallbacks.callback = this
 
         setContent {
@@ -102,12 +152,10 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
     }
 
     override fun onDestroy() {
-        // 注销媒体按钮回调，防止泄漏
         BinkeMediaCallbacks.callback = null
         super.onDestroy()
     }
 
-    // MediaControllerCallback 实现：将媒体按钮事件路由到 ViewModel
     override fun onMediaPlay() {
         if (::viewModel.isInitialized) viewModel.playPause()
     }
@@ -209,21 +257,13 @@ fun MainScreen(viewModel: MainViewModel) {
                     .weight(1f)
                     .pointerInput(currentTab) {
                         detectHorizontalDragGestures(
-                            onDragEnd = {
-                                // 手势结束时不处理，在 onHorizontalDrag 中实时判断
-                            }
+                            onDragEnd = { }
                         ) { change, dragAmount ->
                             change.consume()
-                            // 右滑（dragAmount > 0）→ 切换到左边标签
-                            // 左滑（dragAmount < 0）→ 切换到右边标签
                             val threshold = 80f
                             when {
-                                dragAmount > threshold && currentTab > 0 -> {
-                                    viewModel.setTab(currentTab - 1)
-                                }
-                                dragAmount < -threshold && currentTab < 2 -> {
-                                    viewModel.setTab(currentTab + 1)
-                                }
+                                dragAmount > threshold && currentTab > 0 -> viewModel.setTab(currentTab - 1)
+                                dragAmount < -threshold && currentTab < 2 -> viewModel.setTab(currentTab + 1)
                             }
                         }
                     }
@@ -364,9 +404,13 @@ private fun QueueDialog(
     onPlaySong: (Int) -> Unit,
     onRemoveSong: (Int) -> Unit
 ) {
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
-    // 打开时自动滚动到当前播放的歌曲
     LaunchedEffect(currentIndex) {
         if (currentIndex in songs.indices) {
             listState.scrollToItem(currentIndex)
@@ -387,49 +431,49 @@ private fun QueueDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth(0.5f)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(topStart = 24.sdp(su), topEnd = 24.sdp(su)))
                     .background(Color(0xFF171717))
-                    .padding(20.dp)
+                    .padding(20.sdp(su))
                     .clickable(enabled = false) {}
             ) {
-                Text("当前歌曲列表", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
+                Text("当前歌曲列表", color = Color.White, fontSize = (48 * su).sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.ydp(sy)))
                 LazyColumn(
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.ydp(sy))
                 ) {
                     itemsIndexed(songs) { index, song ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(14.sdp(su)))
                                 .background(if (index == currentIndex) Color(0xFF27273B) else Color(0xFF1F1F23))
                                 .clickable { onPlaySong(index) }
-                                .padding(14.dp),
+                                .padding(14.sdp(su)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = null,
                                 tint = if (index == currentIndex) Color(0xFF8B7DFF) else Color(0xFF8E8E93),
-                                modifier = Modifier.size(52.dp)   // ← 26x2
+                                modifier = Modifier.size(52.sdp(su))
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(10.xdp(sx)))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(song.name, color = Color.White, fontSize = 32.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)   // ← 16x2
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text(song.artist, color = Color(0xFF8E8E93), fontSize = 26.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)   // ← 13x2
+                                Text(song.name, color = Color.White, fontSize = (32 * su).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Spacer(modifier = Modifier.height(2.ydp(sy)))
+                                Text(song.artist, color = Color(0xFF8E8E93), fontSize = (26 * su).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            Text(song.durationText, color = Color(0xFF8E8E93), fontSize = 26.sp)   // ← 13x2
+                            Text(song.durationText, color = Color(0xFF8E8E93), fontSize = (26 * su).sp)
                             IconButton(
                                 onClick = { onRemoveSong(index) },
-                                modifier = Modifier.size(52.dp)   // ← 删除图标按钮x2
+                                modifier = Modifier.size(52.sdp(su))
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
                                     contentDescription = "删除",
                                     tint = Color(0xFF8E8E93),
-                                    modifier = Modifier.fillMaxSize()   // ← 图标填满按钮
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
@@ -448,36 +492,57 @@ private fun AddToPlaylistDialog(
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit
 ) {
-    AlertDialog(
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+
+    CompactDialog(
+        title = "加入歌单",
         onDismissRequest = onDismiss,
-        modifier = Modifier.padding(40.dp),
-        title = { Text("加入歌单", fontSize = 36.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("《$songName》", fontSize = 28.sp)
-                playlists.forEach { playlist ->
-                    val isInPlaylist = playlist.musicList.any { it.id == songId }
-                    Button(
-                        onClick = { onSelect(playlist.id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A31)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(playlist.name, fontSize = 28.sp, modifier = Modifier.weight(1f))
-                        if (isInPlaylist) {
-                            Text("✓", fontSize = 28.sp, color = Color.White)
-                        }
+        sx = sx,
+        sy = sy,
+        su = su,
+        confirmText = "关闭",
+        onConfirm = onDismiss,
+        dismissText = ""
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
+            Text("《$songName》", fontSize = (28 * su).sp, color = Color(0xFFBDBDBD))
+            playlists.forEach { playlist ->
+                val isInPlaylist = playlist.musicList.any { it.id == songId }
+                Button(
+                    onClick = { onSelect(playlist.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(92.ydp(sy)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2A2A31),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 20.xdp(sx),
+                        vertical = 10.ydp(sy)
+                    ),
+                    shape = RoundedCornerShape(16.sdp(su))
+                ) {
+                    Text(
+                        playlist.name,
+                        fontSize = (28 * su).sp,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                        softWrap = false
+                    )
+                    if (isInPlaylist) {
+                        Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))
                     }
                 }
-                if (playlists.isEmpty()) {
-                    Text("暂无自定义歌单，请先到\u201c我的\u201d中新建。", color = Color(0xFF8E8E93), fontSize = 28.sp)
-                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭", fontSize = 28.sp) }
+            if (playlists.isEmpty()) {
+                Text("暂无自定义歌单，请先到\u201c我的\u201d中新建。", color = Color(0xFF8E8E93), fontSize = (28 * su).sp)
+            }
         }
-    )
+    }
 }
