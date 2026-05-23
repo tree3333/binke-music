@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +59,48 @@ private const val BASE_HEIGHT_DP = 1080f
 private fun Int.xdp(sx: Float): Dp = (this * sx).dp
 private fun Int.ydp(sy: Float): Dp = (this * sy).dp
 private fun Int.sdp(su: Float): Dp = (this * su).dp
+
+@Composable
+private fun CompactDialog(
+    title: String,
+    onDismissRequest: () -> Unit,
+    sx: Float,
+    sy: Float,
+    su: Float,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    dismissText: String = "取消",
+    onDismissClick: () -> Unit = onDismissRequest,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier.width(620.xdp(sx)),
+            shape = RoundedCornerShape(24.sdp(su)),
+            color = Color(0xFF1C1C1E)
+        ) {
+            Column(
+                modifier = Modifier.padding(36.sdp(su)),
+                verticalArrangement = Arrangement.spacedBy(20.ydp(sy))
+            ) {
+                Text(title, fontSize = (36 * su).sp, color = Color.White)
+                content()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissClick) {
+                        Text(dismissText, fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
+                    }
+                    TextButton(onClick = onConfirm) {
+                        Text(confirmText, fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun MineScreen(
@@ -135,17 +177,29 @@ fun MineScreen(
         }
 
         if (showCreateDialog) {
-            AlertDialog(
+            CompactDialog(
+                title = "新建歌单",
                 onDismissRequest = {
                     showCreateDialog = false
                     newPlaylistName = ""
                 },
-                modifier = Modifier.padding(40.sdp(su)),
-                containerColor = Color(0xFF1C1C1E),
-                titleContentColor = Color.White,
-                textContentColor = Color.White,
-                title = { Text("新建歌单", fontSize = (36 * su).sp, color = Color.White) },
-                text = {
+                sx = sx,
+                sy = sy,
+                su = su,
+                confirmText = "创建",
+                onConfirm = {
+                    if (newPlaylistName.isNotBlank()) {
+                        onCreatePlaylist(newPlaylistName)
+                        newPlaylistName = ""
+                        showCreateDialog = false
+                    }
+                },
+                onDismissClick = {
+                    showCreateDialog = false
+                    newPlaylistName = ""
+                }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
                     OutlinedTextField(
                         value = newPlaylistName,
                         onValueChange = { newPlaylistName = it },
@@ -178,40 +232,27 @@ fun MineScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            if (newPlaylistName.isNotBlank()) {
-                                onCreatePlaylist(newPlaylistName)
-                                newPlaylistName = ""
-                                showCreateDialog = false
-                            }
-                        }
-                    ) { Text("创建", fontSize = (28 * su).sp, color = Color(0xFF0A84FF)) }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showCreateDialog = false
-                            newPlaylistName = ""
-                        }
-                    ) {
-                        Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
-                    }
                 }
-            )
+            }
         }
 
         if (renameTarget != null) {
-            AlertDialog(
+            CompactDialog(
+                title = "重命名歌单",
                 onDismissRequest = { renameTarget = null },
-                modifier = Modifier.padding(40.sdp(su)),
-                containerColor = Color(0xFF1C1C1E),
-                titleContentColor = Color.White,
-                textContentColor = Color.White,
-                title = { Text("重命名歌单", fontSize = (36 * su).sp, color = Color.White) },
-                text = {
+                sx = sx,
+                sy = sy,
+                su = su,
+                confirmText = "保存",
+                onConfirm = {
+                    val target = renameTarget
+                    if (target != null && renameText.isNotBlank()) {
+                        onRenamePlaylist(target.id, renameText)
+                    }
+                    renameTarget = null
+                }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
                     OutlinedTextField(
                         value = renameText,
                         onValueChange = { renameText = it },
@@ -244,24 +285,8 @@ fun MineScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val target = renameTarget
-                            if (target != null && renameText.isNotBlank()) {
-                                onRenamePlaylist(target.id, renameText)
-                            }
-                            renameTarget = null
-                        }
-                    ) { Text("保存", fontSize = (28 * su).sp, color = Color(0xFF0A84FF)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { renameTarget = null }) {
-                        Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
-                    }
                 }
-            )
+            }
         }
     }
 }

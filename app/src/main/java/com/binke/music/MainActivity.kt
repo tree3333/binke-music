@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -76,6 +79,48 @@ private const val BASE_HEIGHT_DP = 1080f
 private fun Int.xdp(sx: Float): Dp = (this * sx).dp
 private fun Int.ydp(sy: Float): Dp = (this * sy).dp
 private fun Int.sdp(su: Float): Dp = (this * su).dp
+
+@Composable
+private fun CompactDialog(
+    title: String,
+    onDismissRequest: () -> Unit,
+    sx: Float,
+    sy: Float,
+    su: Float,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    dismissText: String = "取消",
+    onDismissClick: () -> Unit = onDismissRequest,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier.width(620.xdp(sx)),
+            shape = RoundedCornerShape(24.sdp(su)),
+            color = Color(0xFF1C1C1E)
+        ) {
+            Column(
+                modifier = Modifier.padding(36.sdp(su)),
+                verticalArrangement = Arrangement.spacedBy(20.ydp(sy))
+            ) {
+                Text(title, fontSize = (36 * su).sp, color = Color.White)
+                content()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissClick) {
+                        Text(dismissText, fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
+                    }
+                    TextButton(onClick = onConfirm) {
+                        Text(confirmText, fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
+                    }
+                }
+            }
+        }
+    }
+}
 
 class MainActivity : ComponentActivity(), MediaControllerCallback {
 
@@ -452,53 +497,52 @@ private fun AddToPlaylistDialog(
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
 
-    AlertDialog(
+    CompactDialog(
+        title = "加入歌单",
         onDismissRequest = onDismiss,
-        modifier = Modifier.padding(40.sdp(su)),
-        containerColor = Color(0xFF1C1C1E),
-        tonalElevation = 0.dp,
-        title = { Text("加入歌单", fontSize = (36 * su).sp, color = Color.White) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
-                Text("《$songName》", fontSize = (28 * su).sp, color = Color(0xFFBDBDBD))
-                playlists.forEach { playlist ->
-                    val isInPlaylist = playlist.musicList.any { it.id == songId }
-                    Button(
-                        onClick = { onSelect(playlist.id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(92.ydp(sy)),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2A2A31),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 20.xdp(sx),
-                            vertical = 10.ydp(sy)
-                        ),
-                        shape = RoundedCornerShape(16.sdp(su))
-                    ) {
-                        Text(
-                            playlist.name,
-                            fontSize = (28 * su).sp,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                            softWrap = false
-                        )
-                        if (isInPlaylist) {
-                            Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))
-                        }
+        sx = sx,
+        sy = sy,
+        su = su,
+        confirmText = "关闭",
+        onConfirm = onDismiss,
+        dismissText = ""
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
+            Text("《$songName》", fontSize = (28 * su).sp, color = Color(0xFFBDBDBD))
+            playlists.forEach { playlist ->
+                val isInPlaylist = playlist.musicList.any { it.id == songId }
+                Button(
+                    onClick = { onSelect(playlist.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(92.ydp(sy)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2A2A31),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 20.xdp(sx),
+                        vertical = 10.ydp(sy)
+                    ),
+                    shape = RoundedCornerShape(16.sdp(su))
+                ) {
+                    Text(
+                        playlist.name,
+                        fontSize = (28 * su).sp,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                        softWrap = false
+                    )
+                    if (isInPlaylist) {
+                        Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))
                     }
                 }
-                if (playlists.isEmpty()) {
-                    Text("暂无自定义歌单，请先到\u201c我的\u201d中新建。", color = Color(0xFF8E8E93), fontSize = (28 * su).sp)
-                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF)) }
+            if (playlists.isEmpty()) {
+                Text("暂无自定义歌单，请先到\u201c我的\u201d中新建。", color = Color(0xFF8E8E93), fontSize = (28 * su).sp)
+            }
         }
-    )
+    }
 }
