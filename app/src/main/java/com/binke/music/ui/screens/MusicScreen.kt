@@ -266,7 +266,7 @@ fun MusicScreen(
 
                         Row(
                             modifier = Modifier.constrainAs(timeRowRef) {
-                                top.linkTo(sliderRef.bottom, margin = (-48).ydp(sy))
+                                top.linkTo(sliderRef.bottom, margin = (-15).ydp(sy))
                                 start.linkTo(parent.start)
                                 end.linkTo(parent.end)
                                 width = Dimension.fillToConstraints
@@ -282,7 +282,7 @@ fun MusicScreen(
                             modifier = Modifier
                                 .size(68.sdp(su))
                                 .constrainAs(playModeRef) {
-                                    top.linkTo(timeRowRef.bottom, margin = 4.ydp(sy))
+                                    top.linkTo(timeRowRef.bottom, margin = 37.ydp(sy))
                                     start.linkTo(parent.start)
                                 }
                         ) {
