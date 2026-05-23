@@ -218,6 +218,8 @@ fun SearchScreen(
 
 @Composable
 private fun SearchResultItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, su: Float) {
+    val coverSize = 120.sdp(su)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -231,7 +233,7 @@ private fun SearchResultItem(song: Song, onClick: () -> Unit, sx: Float, sy: Flo
             model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
             contentDescription = null,
             modifier = Modifier
-                .size(84.sdp(su))
+                .size(coverSize)
                 .clip(RoundedCornerShape(10.sdp(su))),
             contentScale = ContentScale.Crop
         )
