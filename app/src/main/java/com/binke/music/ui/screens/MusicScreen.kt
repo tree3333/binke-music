@@ -63,6 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import coil.compose.AsyncImage
 import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
@@ -157,14 +159,32 @@ fun MusicScreen(
 
                     Spacer(modifier = Modifier.height(22.ydp(sy)))
 
-                    // 歌名品质歌手 + 右侧按钮：整体向中间对齐
-                    Row(
+                    ConstraintLayout(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 95.xdp(sx), end = 12.xdp(sx)),   // ← 左对齐循环按钮
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(start = 95.xdp(sx), end = 95.xdp(sx))
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        val (
+                            titleBlock,
+                            addButton,
+                            favoriteButton,
+                            sliderRef,
+                            timeRowRef,
+                            playModeRef,
+                            previousRef,
+                            playRef,
+                            nextRef,
+                            queueRef
+                        ) = createRefs()
+
+                        Column(
+                            modifier = Modifier.constrainAs(titleBlock) {
+                                start.linkTo(parent.start)
+                                end.linkTo(addButton.start, margin = 24.xdp(sx))
+                                top.linkTo(parent.top)
+                                width = Dimension.fillToConstraints
+                            }
+                        ) {
                             Text(
                                 text = song.name,
                                 color = Color.White,
@@ -192,75 +212,79 @@ fun MusicScreen(
                             }
                         }
 
-                        // 加入歌单 + 收藏：保留左侧文本区，右侧按下排第4/5槽宽度对齐
-                        Row(
-                            modifier = Modifier.width((92 + 68 + 95).xdp(sx)),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        IconButton(
+                            onClick = onAddToPlaylist,
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(addButton) {
+                                    centerHorizontallyTo(nextRef)
+                                    centerVerticallyTo(titleBlock)
+                                }
                         ) {
-                            IconButton(
-                                onClick = onAddToPlaylist,
-                                modifier = Modifier.size(92.sdp(su))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Add,
-                                    contentDescription = "加入歌单",
-                                    tint = Color(0xFF9FA8FF),
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            IconButton(
-                                onClick = onToggleFavorite,
-                                modifier = Modifier.size(68.sdp(su))
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    contentDescription = "收藏",
-                                    tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "加入歌单",
+                                tint = Color(0xFF9FA8FF),
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(18.ydp(sy)))
+                        IconButton(
+                            onClick = onToggleFavorite,
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(favoriteButton) {
+                                    centerHorizontallyTo(queueRef)
+                                    centerVerticallyTo(titleBlock)
+                                }
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = "收藏",
+                                tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
 
-                    // 进度条：左对齐循环按钮，右对齐歌单按钮
-                    val leftAlign = 95.xdp(sx)
-                    val rightAlign = 95.xdp(sx)
-                    Slider(
-                        value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                        onValueChange = { onSeek((it * duration).toLong()) },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(0xFF7B6DFF),
-                            activeTrackColor = Color(0xFF7B6DFF),
-                            inactiveTrackColor = Color(0xFF404040)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = leftAlign, end = rightAlign)
-                    )
+                        Slider(
+                            value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                            onValueChange = { onSeek((it * duration).toLong()) },
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFF7B6DFF),
+                                activeTrackColor = Color(0xFF7B6DFF),
+                                inactiveTrackColor = Color(0xFF404040)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .constrainAs(sliderRef) {
+                                    top.linkTo(titleBlock.bottom, margin = 18.ydp(sy))
+                                    start.linkTo(parent.start)
+                                    end.linkTo(parent.end)
+                                    width = Dimension.fillToConstraints
+                                }
+                        )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = leftAlign, end = rightAlign),   // ← 同步移动
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
-                        Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
-                    }
+                        Row(
+                            modifier = Modifier.constrainAs(timeRowRef) {
+                                top.linkTo(sliderRef.bottom)
+                                start.linkTo(parent.start)
+                                end.linkTo(parent.end)
+                                width = Dimension.fillToConstraints
+                            },
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(formatTime(currentPosition), color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
+                            Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = (22 * su).sp)
+                        }
 
-                    Spacer(modifier = Modifier.height(22.ydp(sy)))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         IconButton(
                             onClick = onTogglePlayMode,
-                            modifier = Modifier.size(68.sdp(su))
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(playModeRef) {
+                                    top.linkTo(timeRowRef.bottom, margin = 22.ydp(sy))
+                                    start.linkTo(parent.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = when (playMode) {
@@ -276,7 +300,13 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onPrevious,
-                            modifier = Modifier.size(92.sdp(su))
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(previousRef) {
+                                    centerVerticallyTo(playModeRef)
+                                    start.linkTo(playModeRef.end)
+                                    end.linkTo(playRef.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SkipPrevious,
@@ -290,7 +320,11 @@ fun MusicScreen(
                             modifier = Modifier
                                 .size(82.sdp(su))
                                 .clip(CircleShape)
-                                .background(Color(0xFF7B6DFF)),
+                                .background(Color(0xFF7B6DFF))
+                                .constrainAs(playRef) {
+                                    centerHorizontallyTo(parent)
+                                    centerVerticallyTo(playModeRef)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             if (isLoading) {
@@ -316,7 +350,13 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onNext,
-                            modifier = Modifier.size(92.sdp(su))
+                            modifier = Modifier
+                                .size(92.sdp(su))
+                                .constrainAs(nextRef) {
+                                    centerVerticallyTo(playRef)
+                                    start.linkTo(playRef.end)
+                                    end.linkTo(queueRef.start)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SkipNext,
@@ -328,7 +368,12 @@ fun MusicScreen(
 
                         IconButton(
                             onClick = onOpenQueue,
-                            modifier = Modifier.size(68.sdp(su))
+                            modifier = Modifier
+                                .size(68.sdp(su))
+                                .constrainAs(queueRef) {
+                                    centerVerticallyTo(playRef)
+                                    end.linkTo(parent.end)
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.QueueMusic,
