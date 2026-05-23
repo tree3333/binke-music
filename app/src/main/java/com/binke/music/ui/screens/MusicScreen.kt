@@ -192,15 +192,12 @@ fun MusicScreen(
                             }
                         }
 
-                        // 加入歌单 + 收藏，与下方控制栏共用五列骨架
+                        // 加入歌单 + 收藏：保留左侧文本区，右侧按下排第4/5槽宽度对齐
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier.width((92 + 68 + 95).xdp(sx)),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Spacer(modifier = Modifier.size(68.sdp(su)))
-                            Spacer(modifier = Modifier.size(92.sdp(su)))
-                            Spacer(modifier = Modifier.size(82.sdp(su)))
                             IconButton(
                                 onClick = onAddToPlaylist,
                                 modifier = Modifier.size(92.sdp(su))
