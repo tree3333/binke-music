@@ -467,10 +467,14 @@ private fun AddToPlaylistDialog(
                         onClick = { onSelect(playlist.id) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(80.ydp(sy)),
+                            .height(92.ydp(sy)),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2A2A31),
                             contentColor = Color.White
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 20.xdp(sx),
+                            vertical = 10.ydp(sy)
                         ),
                         shape = RoundedCornerShape(16.sdp(su))
                     ) {
@@ -480,7 +484,8 @@ private fun AddToPlaylistDialog(
                             color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            softWrap = false
                         )
                         if (isInPlaylist) {
                             Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))

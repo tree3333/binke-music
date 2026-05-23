@@ -171,13 +171,20 @@ fun PlaylistDrawer(
 
                     Button(
                         onClick = onPlayAll,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B5BFF)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6B5BFF),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 20.xdp(sx),
+                            vertical = 8.ydp(sy)
+                        ),
                         shape = RoundedCornerShape(36.sdp(su)),
-                        modifier = Modifier.height(54.ydp(sy))
+                        modifier = Modifier.height(64.ydp(sy))
                     ) {
                         Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.sdp(su)))
                         Spacer(modifier = Modifier.width(12.xdp(sx)))
-                        Text("播放全部", fontSize = (27 * su).sp)
+                        Text("播放全部", fontSize = (27 * su).sp, color = Color.White)
                     }
 
                     Spacer(modifier = Modifier.height(14.ydp(sy)))

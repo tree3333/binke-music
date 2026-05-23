@@ -151,9 +151,9 @@ fun MineScreen(
                         OutlinedTextField(
                             value = newPlaylistName,
                             onValueChange = { newPlaylistName = it },
-                            placeholder = { Text("歌单名称", fontSize = (32 * su).sp) },
+                            placeholder = { Text("歌单名称", fontSize = (32 * su).sp, color = Color(0xFF8E8E93)) },
                             singleLine = true,
-                            textStyle = TextStyle(fontSize = (32 * su).sp),
+                            textStyle = TextStyle(fontSize = (32 * su).sp, color = Color.White),
                             modifier = Modifier.fillMaxWidth().height(88.ydp(sy))
                         )
                         Spacer(Modifier.weight(1f))
@@ -164,7 +164,12 @@ fun MineScreen(
                         ) {
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = { showCreateDialog = false }) {
-                                Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
+                                Text(
+                                    "取消",
+                                    fontSize = (28 * su).sp,
+                                    lineHeight = (32 * su).sp,
+                                    color = Color(0xFF8E8E93)
+                                )
                             }
                             TextButton(
                                 onClick = {
@@ -175,7 +180,12 @@ fun MineScreen(
                                     }
                                 }
                             ) {
-                                Text("创建", fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
+                                Text(
+                                    "创建",
+                                    fontSize = (28 * su).sp,
+                                    lineHeight = (32 * su).sp,
+                                    color = Color(0xFF0A84FF)
+                                )
                             }
                         }
                     }
