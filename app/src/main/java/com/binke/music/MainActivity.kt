@@ -56,6 +56,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.binke.music.data.model.Page
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
+import com.binke.music.player.BinkeMediaCallbacks
+import com.binke.music.player.MediaControllerCallback
 import com.binke.music.ui.MainViewModel
 import com.binke.music.ui.MainViewModelFactory
 import com.binke.music.ui.PlaylistDrawer
@@ -65,7 +67,7 @@ import com.binke.music.ui.screens.MineScreen
 import com.binke.music.ui.screens.MusicScreen
 import com.binke.music.ui.screens.SearchScreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), MediaControllerCallback {
 
     private lateinit var viewModel: MainViewModel
 
@@ -84,11 +86,41 @@ class MainActivity : ComponentActivity() {
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
+        // 注册媒体按钮回调：方向盘/耳机等按钮事件会转发到 ViewModel
+        BinkeMediaCallbacks.callback = this
+
         setContent {
             MainScreen(viewModel = viewModel)
         }
 
         viewModel.loadHomeData()
+    }
+
+    override fun onDestroy() {
+        // 注销媒体按钮回调，防止泄漏
+        BinkeMediaCallbacks.callback = null
+        super.onDestroy()
+    }
+
+    // MediaControllerCallback 实现：将媒体按钮事件路由到 ViewModel
+    override fun onMediaPlay() {
+        if (::viewModel.isInitialized) viewModel.playPause()
+    }
+
+    override fun onMediaPause() {
+        if (::viewModel.isInitialized) viewModel.playPause()
+    }
+
+    override fun onMediaNext() {
+        if (::viewModel.isInitialized) viewModel.next()
+    }
+
+    override fun onMediaPrevious() {
+        if (::viewModel.isInitialized) viewModel.previous()
+    }
+
+    override fun onMediaStop() {
+        if (::viewModel.isInitialized) viewModel.pause()
     }
 
     private fun hideSystemUI() {

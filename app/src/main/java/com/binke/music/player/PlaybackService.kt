@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -37,14 +38,22 @@ class PlaybackService : MediaSessionService() {
         try {
             createNotificationChannel()
 
+            // 复用 Application 中的 ExoPlayer（保持单一实例，UI 状态一致）
             val app = application as? BinkeMusicApp
-            val musicPlayer = app?.musicPlayer
-            val sharedPlayer = musicPlayer?.attachSessionPlayer()
+            val sharedPlayer = try {
+                app?.musicPlayer?.attachSessionPlayer()
+            } catch (e: Exception) {
+                Log.w(TAG, "attachSessionPlayer failed, using local player", e)
+                null
+            }
             val activePlayer = sharedPlayer ?: player
 
             mediaSession = MediaSession.Builder(this, activePlayer)
                 .setSessionActivity(createPendingIntent())
+                .setCallback(MediaButtonCallback())
                 .build()
+
+            Log.d(TAG, "MediaSession created, player=${if (sharedPlayer != null) "shared" else "local"}")
         } catch (e: Exception) {
             Log.e(TAG, "PlaybackService.onCreate failed", e)
         }
@@ -84,13 +93,65 @@ class PlaybackService : MediaSessionService() {
 
     private fun createPendingIntent(): PendingIntent {
         val intent = Intent(this@PlaybackService, MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         return PendingIntent.getActivity(
             this@PlaybackService,
             0,
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+    }
+
+    /**
+     * 拦截媒体按钮事件，转发给 ViewModel 处理。
+     * 返回 true 消费事件，阻止默认行为（ExoPlayer 响应 + 启动其他音乐 App）。
+     */
+    private inner class MediaButtonCallback : MediaSession.Callback {
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaButtonEvent: Intent
+        ): Boolean {
+            val cb = BinkeMediaCallbacks.callback
+            if (cb == null) {
+                Log.w(TAG, "MediaButtonEvent but callback not registered, consuming")
+                return true  // 消费事件，不让汽水音乐接收到
+            }
+
+            val keyEvent = mediaButtonEvent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+                ?: return false
+
+            // 只处理 DOWN 事件，避免重复触发
+            if (keyEvent.action != KeyEvent.ACTION_DOWN) {
+                return true
+            }
+
+            when (keyEvent.keyCode) {
+                KeyEvent.KEYCODE_MEDIA_PLAY,
+                KeyEvent.KEYCODE_MEDIA_PAUSE,
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                KeyEvent.KEYCODE_HEADSETHOOK -> {
+                    cb.onMediaPlay()
+                }
+                KeyEvent.KEYCODE_MEDIA_NEXT,
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    cb.onMediaNext()
+                }
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    cb.onMediaPrevious()
+                }
+                KeyEvent.KEYCODE_MEDIA_STOP -> {
+                    cb.onMediaStop()
+                }
+                else -> {
+                    Log.d(TAG, "Unhandled media button keyCode=${keyEvent.keyCode}")
+                    return false
+                }
+            }
+
+            return true  // 消费事件，阻止 ExoPlayer 和其他 App 处理
+        }
     }
 
     companion object {

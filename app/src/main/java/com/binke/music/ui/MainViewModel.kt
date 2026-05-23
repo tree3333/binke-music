@@ -248,6 +248,11 @@ class MainViewModel(
         _isPlaying.value = musicPlayer.isPlaying()
     }
 
+    fun pause() {
+        musicPlayer.pause()
+        _isPlaying.value = false
+    }
+
     fun previous() {
         if (_playlist.value.isEmpty()) return
         val newIndex = when (_playMode.value) {
