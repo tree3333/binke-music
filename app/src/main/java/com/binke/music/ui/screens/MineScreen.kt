@@ -137,14 +137,15 @@ fun MineScreen(
         if (showCreateDialog) {
             Dialog(onDismissRequest = { showCreateDialog = false }) {
                 Surface(
-                    modifier = Modifier.size(560.xdp(sx), 320.ydp(sy)),
+                    modifier = Modifier.size(620.xdp(sx), 380.ydp(sy)),
                     shape = RoundedCornerShape(24.sdp(su)),
                     color = Color(0xFF1C1C1E)
                 ) {
                     Column(
-                        modifier = Modifier.padding(40.sdp(su)),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(28.ydp(sy))
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(40.sdp(su)),
+                        verticalArrangement = Arrangement.spacedBy(24.ydp(sy))
                     ) {
                         Text("新建歌单", fontSize = (40 * su).sp, color = Color.White)
                         OutlinedTextField(
@@ -153,8 +154,9 @@ fun MineScreen(
                             placeholder = { Text("歌单名称", fontSize = (32 * su).sp) },
                             singleLine = true,
                             textStyle = TextStyle(fontSize = (32 * su).sp),
-                            modifier = Modifier.fillMaxWidth().height(80.ydp(sy))
+                            modifier = Modifier.fillMaxWidth().height(88.ydp(sy))
                         )
+                        Spacer(Modifier.weight(1f))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.xdp(sx)),
                             verticalAlignment = Alignment.CenterVertically,

@@ -455,10 +455,12 @@ private fun AddToPlaylistDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(40.sdp(su)),
-        title = { Text("加入歌单", fontSize = (36 * su).sp) },
+        containerColor = Color(0xFF1C1C1E),
+        tonalElevation = 0.dp,
+        title = { Text("加入歌单", fontSize = (36 * su).sp, color = Color.White) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
-                Text("《$songName》", fontSize = (28 * su).sp)
+                Text("《$songName》", fontSize = (28 * su).sp, color = Color(0xFFBDBDBD))
                 playlists.forEach { playlist ->
                     val isInPlaylist = playlist.musicList.any { it.id == songId }
                     Button(
@@ -466,12 +468,22 @@ private fun AddToPlaylistDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(80.ydp(sy)),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A31)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2A2A31),
+                            contentColor = Color.White
+                        ),
                         shape = RoundedCornerShape(16.sdp(su))
                     ) {
-                        Text(playlist.name, fontSize = (28 * su).sp, modifier = Modifier.weight(1f))
+                        Text(
+                            playlist.name,
+                            fontSize = (28 * su).sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
                         if (isInPlaylist) {
-                            Text("✓", fontSize = (28 * su).sp, color = Color.White)
+                            Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))
                         }
                     }
                 }
@@ -481,7 +493,7 @@ private fun AddToPlaylistDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭", fontSize = (28 * su).sp) }
+            TextButton(onClick = onDismiss) { Text("关闭", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF)) }
         }
     )
 }
