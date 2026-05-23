@@ -358,27 +358,15 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
             ) {
                 when {
-                    isPortrait && searchQuery.isNotEmpty() -> SearchScreen(
-                        query = searchQuery,
-                        searchResults = searchResults,
-                        suggestions = suggestions,
-                        searchHistory = searchHistory,
-                        isSearching = isSearching,
-                        onQueryChange = { viewModel.updateSearchQuery(it) },
-                        onSearch = { viewModel.search(it) },
-                        onSongClick = { viewModel.playSong(it) },
-                        onBack = {
-                            viewModel.updateSearchQuery("")
-                            viewModel.navigateTo(Page.HOME)
-                        },
-                        showSearchBar = false
-                    )
-
                     currentPage == Page.HOME -> HomeScreen(
                         recommendPlaylists = recommendPlaylists,
                         bangPlaylists = bangPlaylists,
                         isLoading = isLoadingHome,
-                        onPlaylistClick = { viewModel.openPlaylistDetail(it) }
+                        onPlaylistClick = { viewModel.openPlaylistDetail(it) },
+                        searchQuery = if (isPortrait) searchQuery else "",
+                        searchResults = if (isPortrait) searchResults else emptyList(),
+                        isSearching = if (isPortrait) isSearching else false,
+                        onSongClick = { viewModel.playSong(it) }
                     )
 
                     currentPage == Page.MUSIC -> MusicScreen(

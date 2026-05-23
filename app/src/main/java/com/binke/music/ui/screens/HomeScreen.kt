@@ -2,6 +2,7 @@ package com.binke.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.binke.music.data.model.Playlist
+import com.binke.music.data.model.Song
 
 private const val BASE_WIDTH_DP = 1920f
 private const val BASE_HEIGHT_DP = 1080f
@@ -47,7 +50,12 @@ fun HomeScreen(
     recommendPlaylists: List<Playlist>,
     bangPlaylists: List<Playlist>,
     isLoading: Boolean,
-    onPlaylistClick: (Playlist) -> Unit
+    onPlaylistClick: (Playlist) -> Unit,
+    // 搜索相关（竖屏内联搜索时传入）
+    searchQuery: String = "",
+    searchResults: List<Song> = emptyList(),
+    isSearching: Boolean = false,
+    onSongClick: (Song) -> Unit = {}
 ) {
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
@@ -76,6 +84,23 @@ fun HomeScreen(
                 contentPadding = PaddingValues(24.xdp(sx), 24.ydp(sy)),
                 verticalArrangement = Arrangement.spacedBy(28.ydp(sy))
             ) {
+                // 搜索结果区块（竖屏内联搜索时显示）
+                if (searchResults.isNotEmpty()) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.ydp(sy))) {
+                            searchResults.forEach { song ->
+                                SearchResultItemHome(song = song, onClick = { onSongClick(song) }, sx = sx, sy = sy, su = su)
+                            }
+                            Text(
+                                text = "共 ${searchResults.size} 条结果",
+                                color = Color(0xFF8E8E93),
+                                fontSize = (28 * su).sp,
+                                modifier = Modifier.padding(vertical = 8.ydp(sy))
+                            )
+                        }
+                    }
+                }
+
                 allSections.forEach { (title, playlists) ->
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
@@ -179,5 +204,65 @@ private fun PlaylistCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun SearchResultItemHome(song: Song, onClick: () -> Unit, sx: Float, sy: Float, su: Float) {
+    val coverSize = 120.sdp(su)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.sdp(su)))
+            .background(Color(0xFF1D1D21))
+            .clickable(onClick = onClick)
+            .padding(14.sdp(su)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
+            contentDescription = null,
+            modifier = Modifier
+                .size(coverSize)
+                .clip(RoundedCornerShape(10.sdp(su))),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.width(16.xdp(sx)))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.name,
+                color = Color.White,
+                fontSize = (36 * su).sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.ydp(sy)))
+            Text(
+                text = song.artist,
+                color = Color(0xFFBDBDBD),
+                fontSize = (28 * su).sp,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(4.ydp(sy)))
+            Text(
+                text = "${song.quality} · ${song.album.ifBlank { "未知专辑" }}",
+                color = Color(0xFF8E8E93),
+                fontSize = (26 * su).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = song.durationText,
+                color = Color(0xFFBDBDBD),
+                fontSize = (28 * su).sp
+            )
+        }
     }
 }
