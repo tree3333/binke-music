@@ -20,13 +20,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -188,7 +186,7 @@ private fun PlaylistDrawerContent(
                 model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
                 contentDescription = null,
                 modifier = Modifier
-                    .size(160.sdp(su))
+                    .size((160 * 1.5f).toInt().sdp(su))
                     .clip(RoundedCornerShape(16.sdp(su))),
                 contentScale = ContentScale.Crop
             )
@@ -199,7 +197,7 @@ private fun PlaylistDrawerContent(
                 Text(
                     text = playlist.name,
                     color = Color.White,
-                    fontSize = (52 * su).sp,
+                    fontSize = (52 * su * 0.7f).sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -221,18 +219,6 @@ private fun PlaylistDrawerContent(
                     )
                 }
             }
-
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(92.sdp(su))
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "关闭",
-                    tint = Color.White,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(18.ydp(sy)))
@@ -248,7 +234,9 @@ private fun PlaylistDrawerContent(
                 vertical = 6.ydp(sy)
             ),
             shape = RoundedCornerShape(36.sdp(su)),
-            modifier = Modifier.height(64.ydp(sy))
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(((30 * su * 1.2f).toInt()).ydp(sy))
         ) {
             Icon(Icons.Filled.PlayArrow, null, Modifier.size(36.sdp(su)))
             Spacer(modifier = Modifier.width(12.xdp(sx)))
@@ -272,40 +260,49 @@ private fun PlaylistDrawerContent(
 
 @Composable
 private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, su: Float) {
+    val coverSize = 120.sdp(su)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.sdp(su)))
-            .background(Color(0xFF222227))
+            .clip(RoundedCornerShape(14.sdp(su)))
+            .background(Color(0xFF1D1D21))
             .clickable(onClick = onClick)
-            .padding(12.sdp(su)),
+            .padding(14.sdp(su)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = song.pic.ifEmpty { "https://via.placeholder.com/80/171717/F1F1F1?text=BinKe" },
+            model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
             contentDescription = null,
             modifier = Modifier
-                .size(72.sdp(su))
+                .size(coverSize)
                 .clip(RoundedCornerShape(10.sdp(su))),
             contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.width(14.xdp(sx)))
+        Spacer(modifier = Modifier.width(16.xdp(sx)))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.name,
                 color = Color.White,
-                fontSize = (34 * su).sp,
+                fontSize = (36 * su).sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(4.ydp(sy)))
             Text(
-                text = "${song.artist} · ${song.quality}",
+                text = song.artist,
                 color = Color(0xFFBDBDBD),
                 fontSize = (28 * su).sp,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(4.ydp(sy)))
+            Text(
+                text = "${song.quality} · ${song.album.ifBlank { "未知专辑" }}",
+                color = Color(0xFF8E8E93),
+                fontSize = (26 * su).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -313,7 +310,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, 
 
         Text(
             text = song.durationText,
-            color = Color(0xFF8E8E93),
+            color = Color(0xFFBDBDBD),
             fontSize = (28 * su).sp
         )
     }
