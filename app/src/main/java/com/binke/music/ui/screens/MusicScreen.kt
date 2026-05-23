@@ -426,8 +426,7 @@ private fun LandscapeMusicScreen(
                     )
                 )
                 .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
-                .padding(top = 0.ydp(sy))
-                .pointerInput(song?.id) {
+                .pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onDragStart = { onIsSwipingChange(true) },
                         onDragEnd = {
@@ -705,23 +704,6 @@ private fun LandscapeMusicScreen(
                 currentPosition = currentPosition,
                 onLineClick = onLyricSeekToLine
             )
-
-            if (isSwiping && abs(swipeOffset) > 50 * sy) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .clip(RoundedCornerShape(18.sdp(su)))
-                        .background(Color(0xAA000000))
-                        .padding(horizontal = 24.xdp(sx), vertical = 16.ydp(sy))
-                ) {
-                    Text(
-                        text = if (swipeOffset < 0) "上滑切到下一首" else "下滑切到上一首",
-                        color = Color.White,
-                        fontSize = (28 * su).sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
     }
 }
