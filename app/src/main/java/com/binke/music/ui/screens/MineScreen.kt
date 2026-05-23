@@ -135,96 +135,72 @@ fun MineScreen(
         }
 
         if (showCreateDialog) {
-            Dialog(onDismissRequest = { showCreateDialog = false }) {
-                Surface(
-                    modifier = Modifier.size(620.xdp(sx), 380.ydp(sy)),
-                    shape = RoundedCornerShape(24.sdp(su)),
-                    color = Color(0xFF1C1C1E)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(40.sdp(su)),
-                        verticalArrangement = Arrangement.spacedBy(24.ydp(sy))
-                    ) {
-                        Text("新建歌单", fontSize = (40 * su).sp, color = Color.White)
-                        OutlinedTextField(
-                            value = newPlaylistName,
-                            onValueChange = { newPlaylistName = it },
-                            placeholder = {
-                                Text(
-                                    "歌单名称",
-                                    fontSize = (32 * su).sp,
-                                    color = Color(0xFF8E8E93)
-                                )
-                            },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                fontSize = (32 * su).sp,
-                                lineHeight = (38 * su).sp,
-                                color = Color.White
-                            ),
-                            shape = RoundedCornerShape(18.sdp(su)),
-                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                disabledTextColor = Color.White,
-                                focusedBorderColor = Color(0xFF8B7DFF),
-                                unfocusedBorderColor = Color(0xFF5A5A60),
-                                focusedContainerColor = Color(0xFF2C2C2E),
-                                unfocusedContainerColor = Color(0xFF2C2C2E),
-                                disabledContainerColor = Color(0xFF2C2C2E),
-                                cursorColor = Color.White,
-                                focusedPlaceholderColor = Color(0xFF8E8E93),
-                                unfocusedPlaceholderColor = Color(0xFF8E8E93)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.xdp(sx)),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Spacer(Modifier.weight(1f))
-                            TextButton(
-                                onClick = { showCreateDialog = false },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                    horizontal = 12.xdp(sx),
-                                    vertical = 10.ydp(sy)
-                                )
-                            ) {
-                                Text(
-                                    "取消",
-                                    fontSize = (28 * su).sp,
-                                    lineHeight = (32 * su).sp,
-                                    color = Color(0xFF8E8E93)
-                                )
-                            }
-                            TextButton(
-                                onClick = {
-                                    if (newPlaylistName.isNotBlank()) {
-                                        onCreatePlaylist(newPlaylistName)
-                                        newPlaylistName = ""
-                                        showCreateDialog = false
-                                    }
-                                },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                    horizontal = 12.xdp(sx),
-                                    vertical = 10.ydp(sy)
-                                )
-                            ) {
-                                Text(
-                                    "创建",
-                                    fontSize = (28 * su).sp,
-                                    lineHeight = (32 * su).sp,
-                                    color = Color(0xFF0A84FF)
-                                )
+            AlertDialog(
+                onDismissRequest = {
+                    showCreateDialog = false
+                    newPlaylistName = ""
+                },
+                modifier = Modifier.padding(40.sdp(su)),
+                containerColor = Color(0xFF1C1C1E),
+                titleContentColor = Color.White,
+                textContentColor = Color.White,
+                title = { Text("新建歌单", fontSize = (36 * su).sp, color = Color.White) },
+                text = {
+                    OutlinedTextField(
+                        value = newPlaylistName,
+                        onValueChange = { newPlaylistName = it },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            fontSize = (28 * su).sp,
+                            lineHeight = (34 * su).sp,
+                            color = Color.White
+                        ),
+                        placeholder = {
+                            Text(
+                                "歌单名称",
+                                fontSize = (28 * su).sp,
+                                color = Color(0xFF8E8E93)
+                            )
+                        },
+                        shape = RoundedCornerShape(18.sdp(su)),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            disabledTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF8B7DFF),
+                            unfocusedBorderColor = Color(0xFF5A5A60),
+                            focusedContainerColor = Color(0xFF2C2C2E),
+                            unfocusedContainerColor = Color(0xFF2C2C2E),
+                            disabledContainerColor = Color(0xFF2C2C2E),
+                            cursorColor = Color.White,
+                            focusedPlaceholderColor = Color(0xFF8E8E93),
+                            unfocusedPlaceholderColor = Color(0xFF8E8E93)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (newPlaylistName.isNotBlank()) {
+                                onCreatePlaylist(newPlaylistName)
+                                newPlaylistName = ""
+                                showCreateDialog = false
                             }
                         }
+                    ) { Text("创建", fontSize = (28 * su).sp, color = Color(0xFF0A84FF)) }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showCreateDialog = false
+                            newPlaylistName = ""
+                        }
+                    ) {
+                        Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
                     }
                 }
-            }
+            )
         }
 
         if (renameTarget != null) {
