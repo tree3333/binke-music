@@ -67,7 +67,8 @@ fun SearchScreen(
     onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
     onSongClick: (Song) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showSearchBar: Boolean = true
 ) {
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
@@ -86,6 +87,7 @@ fun SearchScreen(
             .background(Color(0xFF121212))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+            if (showSearchBar) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -145,6 +147,7 @@ fun SearchScreen(
                         maxLines = 1
                     )
                 }
+            }
             }
 
             when {

@@ -370,7 +370,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onBack = {
                             viewModel.updateSearchQuery("")
                             viewModel.navigateTo(Page.HOME)
-                        }
+                        },
+                        showSearchBar = false
                     )
 
                     currentPage == Page.HOME -> HomeScreen(
