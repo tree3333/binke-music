@@ -192,20 +192,18 @@ fun MusicScreen(
                             }
                         }
 
-                        // 加入歌单 + 收藏，与下方控制栏对齐
+                        // 加入歌单 + 收藏，与下方控制栏共用五列骨架
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.sdp(su)),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 前3个位置占位，与循环/上一首/播放对齐
                             Spacer(modifier = Modifier.size(68.sdp(su)))
                             Spacer(modifier = Modifier.size(92.sdp(su)))
                             Spacer(modifier = Modifier.size(82.sdp(su)))
                             IconButton(
                                 onClick = onAddToPlaylist,
-                                modifier = Modifier
-                                    .size(82.sdp(su))
-                                    .offset(x = (-161).xdp(sx))
+                                modifier = Modifier.size(92.sdp(su))
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Add,
@@ -216,9 +214,7 @@ fun MusicScreen(
                             }
                             IconButton(
                                 onClick = onToggleFavorite,
-                                modifier = Modifier
-                                    .size(82.sdp(su))
-                                    .offset(x = (-76).xdp(sx))
+                                modifier = Modifier.size(68.sdp(su))
                             ) {
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
