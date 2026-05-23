@@ -71,6 +71,7 @@ import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
 import com.binke.music.data.model.Song
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private const val BASE_WIDTH_DP = 1920f
 private const val BASE_HEIGHT_DP = 1080f
@@ -427,21 +428,27 @@ private fun LandscapeMusicScreen(
                 )
                 .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
                 .pointerInput(Unit) {
+                    var accumulatedDrag = 0f
                     detectVerticalDragGestures(
                         onDragStart = { onIsSwipingChange(true) },
                         onDragEnd = {
                             onIsSwipingChange(false)
                             when {
-                                swipeOffset < -120 * sy -> onNext()
-                                swipeOffset > 120 * sy -> onPrevious()
+                                accumulatedDrag < -120 * sy -> onNext()
+                                accumulatedDrag > 120 * sy -> onPrevious()
                             }
+                            accumulatedDrag = 0f
                             onSwipeOffsetChange(0f)
                         },
                         onDragCancel = {
                             onIsSwipingChange(false)
+                            accumulatedDrag = 0f
                             onSwipeOffsetChange(0f)
                         },
-                        onVerticalDrag = { _, dragAmount -> onSwipeOffsetChange(swipeOffset + dragAmount) }
+                        onVerticalDrag = { _, dragAmount ->
+                            accumulatedDrag += dragAmount
+                            onSwipeOffsetChange(accumulatedDrag)
+                        }
                     )
                 }
         ) {
@@ -451,12 +458,11 @@ private fun LandscapeMusicScreen(
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    val coverScale = 1f + (abs(swipeOffset) / 300f).coerceAtMost(0.15f).let { if (swipeOffset < 0) 1f - it else 1f + it }
                     AsyncImage(
                         model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
                         contentDescription = "专辑封面",
                         modifier = Modifier
-                            .size((432.sdp(su).value * coverScale).dp)
+                            .size(432.sdp(su))
                             .clip(RoundedCornerShape(24.sdp(su))),
                         contentScale = ContentScale.Crop
                     )
