@@ -25,12 +25,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.binke.music.data.model.Playlist
+
+private const val BASE_WIDTH_DP = 1920f
+private const val BASE_HEIGHT_DP = 1080f
+
+private fun Int.xdp(sx: Float): Dp = (this * sx).dp
+private fun Int.ydp(sy: Float): Dp = (this * sy).dp
+private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @Composable
 fun HomeScreen(
@@ -39,6 +48,11 @@ fun HomeScreen(
     isLoading: Boolean,
     onPlaylistClick: (Playlist) -> Unit
 ) {
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+
     val allSections = buildList {
         if (recommendPlaylists.isNotEmpty()) add("每日推荐" to recommendPlaylists.take(6))
         if (bangPlaylists.isNotEmpty()) add("热门榜单" to bangPlaylists.take(8))
@@ -58,20 +72,26 @@ fun HomeScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(28.dp)
+                contentPadding = PaddingValues(24.xdp(sx), 24.ydp(sy)),
+                verticalArrangement = Arrangement.spacedBy(28.ydp(sy))
             ) {
                 allSections.forEach { (title, playlists) ->
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.ydp(sy))) {
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = Color.White,
-                                fontSize = 52.sp,
+                                fontSize = (52 * su).sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            PlaylistGrid(playlists = playlists, onPlaylistClick = onPlaylistClick)
+                            PlaylistGrid(
+                                playlists = playlists,
+                                onPlaylistClick = onPlaylistClick,
+                                sx = sx,
+                                sy = sy,
+                                su = su
+                            )
                         }
                     }
                 }
@@ -81,15 +101,23 @@ fun HomeScreen(
 }
 
 @Composable
-private fun PlaylistGrid(playlists: List<Playlist>, onPlaylistClick: (Playlist) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+private fun PlaylistGrid(
+    playlists: List<Playlist>,
+    onPlaylistClick: (Playlist) -> Unit,
+    sx: Float,
+    sy: Float,
+    su: Float
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(18.ydp(sy))) {
         playlists.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.xdp(sx))) {
                 row.forEach { playlist ->
                     PlaylistCard(
                         playlist = playlist,
                         onClick = { onPlaylistClick(playlist) },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        sy = sy,
+                        su = su
                     )
                 }
                 repeat(4 - row.size) {
@@ -105,34 +133,36 @@ private fun PlaylistGrid(playlists: List<Playlist>, onPlaylistClick: (Playlist) 
 private fun PlaylistCard(
     playlist: Playlist,
     onClick: () -> Unit,
+    sy: Float,
+    su: Float,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.sdp(su)))
             .background(Color(0xFF1B1B1F))
             .combinedClickable(onClick = onClick)
-            .padding(10.dp)
+            .padding(10.sdp(su))
     ) {
         AsyncImage(
             model = playlist.img.ifEmpty { "https://via.placeholder.com/300/171717/F1F1F1?text=BinKe" },
             contentDescription = playlist.name,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .height(324.dp),
+                .clip(RoundedCornerShape(14.sdp(su)))
+                .height(324.ydp(sy)),
             contentScale = ContentScale.Crop
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(10.ydp(sy)))
         Text(
             text = playlist.name,
             color = Color.White,
-            fontSize = 32.sp,
+            fontSize = (32 * su).sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(6.ydp(sy)))
         Text(
             text = when {
                 playlist.total > 0 -> "${playlist.total}首"
@@ -140,7 +170,7 @@ private fun PlaylistCard(
                 else -> playlist.creator.ifBlank { "推荐歌单" }
             },
             color = Color(0xFF8E8E93),
-            fontSize = 24.sp,
+            fontSize = (24 * su).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
