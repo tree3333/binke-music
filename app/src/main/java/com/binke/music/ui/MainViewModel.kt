@@ -213,17 +213,17 @@ class MainViewModel(
                 apiService.getPlaylistDetail(playlistId, rn = 100)
             }
             if (detail != null) {
-                // 封面增强：网易云 → iTunes → 酷我兜底
+                // 封面增强：iTunes → 网易云 → 酷我兜底
                 val enhancedSongs = withContext(Dispatchers.IO) {
                     detail.musicList.map { song ->
                         async {
                             if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                                // 1. 优先网易云
-                                val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                                if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
-                                // 2. 其次 iTunes
+                                // 1. 优先 iTunes
                                 val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
                                 if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
+                                // 2. 其次网易云
+                                val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                                if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
                             }
                             song
                         }
@@ -632,17 +632,17 @@ class MainViewModel(
             val results = withContext(Dispatchers.IO) {
                 apiService.searchSongs(query)
             }
-            // 封面增强：网易云 → iTunes → 酷我兜底
+            // 封面增强：iTunes → 网易云 → 酷我兜底
             val enhanced = withContext(Dispatchers.IO) {
                 results.map { song ->
                     async {
                         if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                            // 1. 优先网易云
-                            val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                            if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
-                            // 2. 其次 iTunes
+                            // 1. 优先 iTunes
                             val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
                             if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
+                            // 2. 其次网易云
+                            val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                            if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
                         }
                         song
                     }
