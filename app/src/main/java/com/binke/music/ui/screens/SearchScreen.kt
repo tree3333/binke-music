@@ -130,11 +130,14 @@ fun SearchScreen(
 
                 Button(
                     onClick = { onSearch(inputText) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B5BFF)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6B5BFF),
+                        contentColor = Color.White
+                    ),
                     shape = RoundedCornerShape(28.sdp(su)),
                     modifier = Modifier.width(180.xdp(sx)).height(56.ydp(sy))
                 ) {
-                    Text("搜      索", fontSize = (27 * su).sp)
+                    Text("搜索", fontSize = (27 * su).sp, color = Color.White)
                 }
             }
 
