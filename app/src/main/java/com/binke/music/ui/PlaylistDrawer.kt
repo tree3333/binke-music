@@ -229,14 +229,10 @@ private fun PlaylistDrawerContent(
                 containerColor = Color(0xFF6B5BFF),
                 contentColor = Color.White
             ),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                horizontal = 20.xdp(sx),
-                vertical = 6.ydp(sy)
-            ),
             shape = RoundedCornerShape(36.sdp(su)),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(((30 * su * 1.2f).toInt()).ydp(sy))
+                .padding(horizontal = 16.xdp(sx))
         ) {
             Icon(Icons.Filled.PlayArrow, null, Modifier.size(36.sdp(su)))
             Spacer(modifier = Modifier.width(12.xdp(sx)))
