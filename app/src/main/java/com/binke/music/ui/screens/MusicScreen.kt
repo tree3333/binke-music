@@ -415,24 +415,6 @@ private fun LandscapeMusicScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF121212))
-            .pointerInput(song?.id) {
-                detectVerticalDragGestures(
-                    onDragStart = { onIsSwipingChange(true) },
-                    onDragEnd = {
-                        onIsSwipingChange(false)
-                        when {
-                            swipeOffset < -120 * sy -> onNext()
-                            swipeOffset > 120 * sy -> onPrevious()
-                        }
-                        onSwipeOffsetChange(0f)
-                    },
-                    onDragCancel = {
-                        onIsSwipingChange(false)
-                        onSwipeOffsetChange(0f)
-                    },
-                    onVerticalDrag = { _, dragAmount -> onSwipeOffsetChange(swipeOffset + dragAmount) }
-                )
-            }
     ) {
         Box(
             modifier = Modifier
@@ -445,6 +427,24 @@ private fun LandscapeMusicScreen(
                 )
                 .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
                 .padding(top = 0.ydp(sy))
+                .pointerInput(song?.id) {
+                    detectVerticalDragGestures(
+                        onDragStart = { onIsSwipingChange(true) },
+                        onDragEnd = {
+                            onIsSwipingChange(false)
+                            when {
+                                swipeOffset < -120 * sy -> onNext()
+                                swipeOffset > 120 * sy -> onPrevious()
+                            }
+                            onSwipeOffsetChange(0f)
+                        },
+                        onDragCancel = {
+                            onIsSwipingChange(false)
+                            onSwipeOffsetChange(0f)
+                        },
+                        onVerticalDrag = { _, dragAmount -> onSwipeOffsetChange(swipeOffset + dragAmount) }
+                    )
+                }
         ) {
             if (song == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
