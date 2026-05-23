@@ -14,6 +14,7 @@ import com.binke.music.player.MusicPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -212,8 +213,19 @@ class MainViewModel(
                 apiService.getPlaylistDetail(playlistId, rn = 100)
             }
             if (detail != null) {
-                _drawerPlaylist.value = detail
-                _drawerSongs.value = detail.musicList
+                // iTunes 封面增强
+                val enhancedSongs = withContext(Dispatchers.IO) {
+                    detail.musicList.map { song ->
+                        async {
+                            if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                                val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                                if (itunesPic.isNotBlank()) song.copy(pic = itunesPic) else song
+                            } else song
+                        }
+                    }.awaitAll()
+                }
+                _drawerPlaylist.value = detail.copy(musicList = enhancedSongs)
+                _drawerSongs.value = enhancedSongs
             }
         }
     }
@@ -615,7 +627,18 @@ class MainViewModel(
             val results = withContext(Dispatchers.IO) {
                 apiService.searchSongs(query)
             }
-            _searchResults.value = results
+            // iTunes 封面增强：并行请求，有结果则替换
+            val enhanced = withContext(Dispatchers.IO) {
+                results.map { song ->
+                    async {
+                        if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                            val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                            if (itunesPic.isNotBlank()) song.copy(pic = itunesPic) else song
+                        } else song
+                    }
+                }.awaitAll()
+            }
+            _searchResults.value = enhanced
         } finally {
             _isSearching.value = false
         }
