@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -151,19 +152,36 @@ fun MineScreen(
                         OutlinedTextField(
                             value = newPlaylistName,
                             onValueChange = { newPlaylistName = it },
-                            placeholder = { Text("歌单名称", fontSize = (32 * su).sp, color = Color(0xFF8E8E93)) },
+                            placeholder = {
+                                Text(
+                                    "歌单名称",
+                                    fontSize = (32 * su).sp,
+                                    color = Color(0xFF8E8E93)
+                                )
+                            },
                             singleLine = true,
-                            textStyle = TextStyle(fontSize = (32 * su).sp, color = Color.White),
+                            textStyle = TextStyle(
+                                fontSize = (32 * su).sp,
+                                lineHeight = (38 * su).sp,
+                                color = Color.White
+                            ),
+                            shape = RoundedCornerShape(18.sdp(su)),
                             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
+                                disabledTextColor = Color.White,
                                 focusedBorderColor = Color(0xFF8B7DFF),
                                 unfocusedBorderColor = Color(0xFF5A5A60),
+                                focusedContainerColor = Color(0xFF2C2C2E),
+                                unfocusedContainerColor = Color(0xFF2C2C2E),
+                                disabledContainerColor = Color(0xFF2C2C2E),
                                 cursorColor = Color.White,
                                 focusedPlaceholderColor = Color(0xFF8E8E93),
                                 unfocusedPlaceholderColor = Color(0xFF8E8E93)
                             ),
-                            modifier = Modifier.fillMaxWidth().height(96.ydp(sy))
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 112.ydp(sy))
                         )
                         Spacer(Modifier.weight(1f))
                         Row(
@@ -216,14 +234,42 @@ fun MineScreen(
             AlertDialog(
                 onDismissRequest = { renameTarget = null },
                 modifier = Modifier.padding(40.sdp(su)),
-                title = { Text("重命名歌单", fontSize = (36 * su).sp) },
+                containerColor = Color(0xFF1C1C1E),
+                titleContentColor = Color.White,
+                textContentColor = Color.White,
+                title = { Text("重命名歌单", fontSize = (36 * su).sp, color = Color.White) },
                 text = {
                     OutlinedTextField(
                         value = renameText,
                         onValueChange = { renameText = it },
                         singleLine = true,
-                        textStyle = TextStyle(fontSize = (28 * su).sp),
-                        placeholder = { Text("歌单名称", fontSize = (28 * su).sp) }
+                        textStyle = TextStyle(
+                            fontSize = (28 * su).sp,
+                            lineHeight = (34 * su).sp,
+                            color = Color.White
+                        ),
+                        placeholder = {
+                            Text(
+                                "歌单名称",
+                                fontSize = (28 * su).sp,
+                                color = Color(0xFF8E8E93)
+                            )
+                        },
+                        shape = RoundedCornerShape(18.sdp(su)),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            disabledTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF8B7DFF),
+                            unfocusedBorderColor = Color(0xFF5A5A60),
+                            focusedContainerColor = Color(0xFF2C2C2E),
+                            unfocusedContainerColor = Color(0xFF2C2C2E),
+                            disabledContainerColor = Color(0xFF2C2C2E),
+                            cursorColor = Color.White,
+                            focusedPlaceholderColor = Color(0xFF8E8E93),
+                            unfocusedPlaceholderColor = Color(0xFF8E8E93)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 confirmButton = {
@@ -235,10 +281,12 @@ fun MineScreen(
                             }
                             renameTarget = null
                         }
-                    ) { Text("保存", fontSize = (28 * su).sp) }
+                    ) { Text("保存", fontSize = (28 * su).sp, color = Color(0xFF0A84FF)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { renameTarget = null }) { Text("取消", fontSize = (28 * su).sp) }
+                    TextButton(onClick = { renameTarget = null }) {
+                        Text("取消", fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
+                    }
                 }
             )
         }
