@@ -157,12 +157,12 @@ fun MusicScreen(
                         contentScale = ContentScale.Crop
                     )
 
-                    Spacer(modifier = Modifier.height(16.ydp(sy)))
+                    Spacer(modifier = Modifier.height(40.ydp(sy)))
 
                     ConstraintLayout(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 72.xdp(sx), end = 72.xdp(sx))
+                            .padding(start = 36.xdp(sx), end = 36.xdp(sx))
                     ) {
                         val (
                             titleBlock,
@@ -257,7 +257,7 @@ fun MusicScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .constrainAs(sliderRef) {
-                                    top.linkTo(titleBlock.bottom, margin = 12.ydp(sy))
+                                    top.linkTo(titleBlock.bottom, margin = 4.ydp(sy))
                                     start.linkTo(parent.start)
                                     end.linkTo(parent.end)
                                     width = Dimension.fillToConstraints
@@ -266,7 +266,7 @@ fun MusicScreen(
 
                         Row(
                             modifier = Modifier.constrainAs(timeRowRef) {
-                                top.linkTo(sliderRef.bottom, margin = 2.ydp(sy))
+                                top.linkTo(sliderRef.bottom, margin = 0.ydp(sy))
                                 start.linkTo(parent.start)
                                 end.linkTo(parent.end)
                                 width = Dimension.fillToConstraints
@@ -282,7 +282,7 @@ fun MusicScreen(
                             modifier = Modifier
                                 .size(68.sdp(su))
                                 .constrainAs(playModeRef) {
-                                    top.linkTo(timeRowRef.bottom, margin = 14.ydp(sy))
+                                    top.linkTo(timeRowRef.bottom, margin = 4.ydp(sy))
                                     start.linkTo(parent.start)
                                 }
                         ) {
