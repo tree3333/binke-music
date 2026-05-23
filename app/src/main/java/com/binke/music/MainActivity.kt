@@ -1,6 +1,7 @@
 package com.binke.music
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
@@ -58,6 +59,7 @@ import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.player.BinkeMediaCallbacks
 import com.binke.music.player.MediaControllerCallback
+import com.binke.music.player.PlaybackService
 import com.binke.music.ui.MainViewModel
 import com.binke.music.ui.MainViewModelFactory
 import com.binke.music.ui.PlaylistDrawer
@@ -85,6 +87,9 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
         val app = application as BinkeMusicApp
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
+
+        // 启动 PlaybackService，确保 MediaSession 始终存在，系统才知道彬可音乐是活跃媒体播放器
+        startPlaybackService()
 
         // 注册媒体按钮回调：方向盘/耳机等按钮事件会转发到 ViewModel
         BinkeMediaCallbacks.callback = this
@@ -121,6 +126,19 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
 
     override fun onMediaStop() {
         if (::viewModel.isInitialized) viewModel.pause()
+    }
+
+    private fun startPlaybackService() {
+        val intent = Intent(this, PlaybackService::class.java)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to start PlaybackService", e)
+        }
     }
 
     private fun hideSystemUI() {

@@ -1,5 +1,6 @@
 package com.binke.music.player
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,6 +9,7 @@ import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
 import androidx.annotation.OptIn
+import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
@@ -16,6 +18,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.binke.music.BinkeMusicApp
 import com.binke.music.MainActivity
+import com.binke.music.R
 
 class PlaybackService : MediaSessionService() {
 
@@ -56,6 +59,9 @@ class PlaybackService : MediaSessionService() {
                 .setCallback(MediaButtonCallback())
                 .build()
 
+            // 启动前台服务（Android 8.0+ startForegroundService 要求 5 秒内 startForeground）
+            startForeground(NOTIFICATION_ID, createPlaceholderNotification())
+
             Log.d(TAG, "MediaSession created, player=${if (sharedPlayer != null) "shared" else "local"}, owns=$serviceOwnsPlayer")
         } catch (e: Exception) {
             Log.e(TAG, "PlaybackService.onCreate failed", e)
@@ -85,9 +91,13 @@ class PlaybackService : MediaSessionService() {
                         KeyEvent.KEYCODE_MEDIA_REWIND -> cb.onMediaPrevious()
                         KeyEvent.KEYCODE_MEDIA_STOP -> cb.onMediaStop()
                     }
+                } else {
+                    Log.w(TAG, "MEDIA_BUTTON received but callback not registered (activity not running)")
                 }
             }
-            // 消费事件，不重启 service
+            // 不要在这里 startForeground，因为没有 notification。
+            // 如果 MediaSession 已经建立，系统不会要求前台服务。
+            // 如果未建立，让服务自然结束。
             return START_NOT_STICKY
         }
         return super.onStartCommand(intent, flags, startId)
@@ -136,6 +146,17 @@ class PlaybackService : MediaSessionService() {
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+    }
+
+    private fun createPlaceholderNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("彬可音乐")
+            .setContentText("媒体控制已就绪")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(createPendingIntent())
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
 
     /**
@@ -193,5 +214,6 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "PlaybackService"
         private const val CHANNEL_ID = "binke_music_playback"
+        private const val NOTIFICATION_ID = 1
     }
 }
