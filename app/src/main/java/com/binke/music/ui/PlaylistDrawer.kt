@@ -248,11 +248,11 @@ private fun PlaylistDrawerContent(
                 vertical = 8.ydp(sy)
             ),
             shape = RoundedCornerShape(36.sdp(su)),
-            modifier = Modifier.height(64.ydp(sy))
+            modifier = Modifier.height(92.ydp(sy))
         ) {
-            Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.sdp(su)))
+            Icon(Icons.Filled.PlayArrow, null, Modifier.size(48.sdp(su)))
             Spacer(modifier = Modifier.width(12.xdp(sx)))
-            Text("播放全部", fontSize = (27 * su).sp, color = Color.White)
+            Text("播放全部", fontSize = (36 * su).sp, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(14.ydp(sy)))

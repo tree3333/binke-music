@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -133,14 +134,6 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        try {
-            enableEdgeToEdge()
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            hideSystemUI()
-        } catch (e: Throwable) {
-            // Android 8.1 不兼容 API，忽略
-        }
-
         val app = application as BinkeMusicApp
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
@@ -192,13 +185,6 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
             android.util.Log.e("MainActivity", "Failed to start PlaybackService", e)
         }
     }
-
-    private fun hideSystemUI() {
-        window.insetsController?.let { controller ->
-            controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-            controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
 }
 
 @Composable
@@ -243,6 +229,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
 
     val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
     val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
 
     val isFavorite = currentSong?.let { viewModel.isFavorite(it.id) } ?: false
@@ -253,7 +242,38 @@ fun MainScreen(viewModel: MainViewModel) {
             .background(Color(0xFF121212))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 横屏用顶部栏，竖屏用底部栏
+            // 竖屏时搜索栏放最上面
+            if (isPortrait) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.xdp(sx), vertical = 12.ydp(sy))
+                        .height(80.ydp(sy))
+                        .background(Color(0xFF26262B), RoundedCornerShape(40.sdp(su)))
+                        .clickable(onClick = { viewModel.navigateTo(Page.SEARCH) }),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 24.xdp(sx)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜索",
+                            tint = Color(0xFF8E8E93),
+                            modifier = Modifier.size(40.sdp(su))
+                        )
+                        Spacer(modifier = Modifier.width(16.xdp(sx)))
+                        Text(
+                            text = "搜索歌手、歌曲名称",
+                            color = Color(0xFF8E8E93),
+                            fontSize = (32 * su).sp
+                        )
+                    }
+                }
+            }
+
+            // 横屏用顶部栏，竖屏不用（搜索栏已放上面）
             if (!isPortrait) {
                 TopBar(
                     currentTab = currentTab,
@@ -535,17 +555,20 @@ private fun AddToPlaylistDialog(
                     onClick = { onSelect(playlist.id) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(92.ydp(sy)),
+                        .height(72.ydp(sy)),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF2A2A31),
                         contentColor = Color.White
                     ),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 20.xdp(sx),
-                        vertical = 10.ydp(sy)
+                        vertical = 8.ydp(sy)
                     ),
                     shape = RoundedCornerShape(16.sdp(su))
                 ) {
+                    if (isInPlaylist) {
+                        Text("✓", fontSize = (34 * su).sp, color = Color(0xFF8B7DFF), modifier = Modifier.padding(end = 8.xdp(sx)))
+                    }
                     Text(
                         playlist.name,
                         fontSize = (28 * su).sp,
@@ -555,9 +578,6 @@ private fun AddToPlaylistDialog(
                         modifier = Modifier.weight(1f),
                         softWrap = false
                     )
-                    if (isInPlaylist) {
-                        Text("✓", fontSize = (28 * su).sp, color = Color(0xFF8B7DFF))
-                    }
                 }
             }
             if (playlists.isEmpty()) {
