@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -94,9 +95,11 @@ private fun CompactDialog(
     onDismissClick: () -> Unit = onDismissRequest,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val cfg = LocalConfiguration.current
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
-            modifier = Modifier.width(620.xdp(sx)),
+            modifier = Modifier.width(if (isPortrait) cfg.screenWidthDp.dp * 0.85f else 620.xdp(sx)),
             shape = RoundedCornerShape(24.sdp(su)),
             color = Color(0xFF1C1C1E)
         ) {
@@ -423,6 +426,7 @@ private fun QueueDialog(
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
@@ -445,7 +449,8 @@ private fun QueueDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.5f)
+                    .fillMaxWidth(if (isPortrait) 0.95f else 0.5f)
+                    .fillMaxHeight(if (isPortrait) 0.7f else 0.85f)
                     .clip(RoundedCornerShape(topStart = 24.sdp(su), topEnd = 24.sdp(su)))
                     .background(Color(0xFF171717))
                     .padding(20.sdp(su))

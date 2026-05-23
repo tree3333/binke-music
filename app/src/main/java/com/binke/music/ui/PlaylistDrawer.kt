@@ -2,7 +2,7 @@ package com.binke.music.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,131 +75,196 @@ fun PlaylistDrawer(
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
 
-    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            Box(
+        if (isPortrait) {
+            // 竖屏：从下往上弹出
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clickable(onClick = onDismiss)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.75f)
+                        .offset { IntOffset(0, offsetY.roundToInt()) }
+                        .clip(RoundedCornerShape(topStart = 24.sdp(su), topEnd = 24.sdp(su)))
+                        .background(Color(0xFF171717))
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    if (offsetY > 120f * sy) {
+                                        onDismiss()
+                                    }
+                                    offsetY = 0f
+                                },
+                                onVerticalDrag = { _, dragAmount ->
+                                    offsetY = (offsetY + dragAmount).coerceAtLeast(0f)
+                                }
+                            )
+                        }
+                        .padding(20.sdp(su))
+                ) {
+                    PlaylistDrawerContent(
+                        playlist = playlist,
+                        songs = songs,
+                        onDismiss = onDismiss,
+                        onPlayAll = onPlayAll,
+                        onSongClick = onSongClick,
+                        sx = sx, sy = sy, su = su
+                    )
+                }
+            }
+        } else {
+            // 横屏：从右往左弹出（保持原样）
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(onClick = onDismiss)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .width(778.xdp(sx))
+                        .fillMaxHeight()
+                        .offset { IntOffset(offsetY.roundToInt(), 0) }
+                        .background(Color(0xFF171717))
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    if (offsetY > 120f * sx) {
+                                        onDismiss()
+                                    }
+                                    offsetY = 0f
+                                },
+                                onVerticalDrag = { _, dragAmount ->
+                                    offsetY = (offsetY + dragAmount).coerceAtLeast(0f)
+                                }
+                            )
+                        }
+                        .padding(20.sdp(su))
+                ) {
+                    PlaylistDrawerContent(
+                        playlist = playlist,
+                        songs = songs,
+                        onDismiss = onDismiss,
+                        onPlayAll = onPlayAll,
+                        onSongClick = onSongClick,
+                        sx = sx, sy = sy, su = su
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistDrawerContent(
+    playlist: Playlist,
+    songs: List<Song>,
+    onDismiss: () -> Unit,
+    onPlayAll: () -> Unit,
+    onSongClick: (Int) -> Unit,
+    sx: Float, sy: Float, su: Float
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
+                contentDescription = null,
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable(onClick = onDismiss)
+                    .size(160.sdp(su))
+                    .clip(RoundedCornerShape(16.sdp(su))),
+                contentScale = ContentScale.Crop
             )
 
-            Box(
-                modifier = Modifier
-                    .width(778.xdp(sx))
-                    .fillMaxHeight()
-                    .offset { IntOffset(offsetX.roundToInt(), 0) }
-                    .background(Color(0xFF171717))
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (offsetX > 120f * sx) {
-                                    onDismiss()
-                                }
-                                offsetX = 0f
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                offsetX = (offsetX + dragAmount).coerceAtLeast(0f)
-                            }
-                        )
-                    }
-                    .padding(20.sdp(su))
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(160.sdp(su))
-                                .clip(RoundedCornerShape(16.sdp(su))),
-                            contentScale = ContentScale.Crop
-                        )
+            Spacer(modifier = Modifier.width(18.xdp(sx)))
 
-                        Spacer(modifier = Modifier.width(18.xdp(sx)))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = playlist.name,
-                                color = Color.White,
-                                fontSize = (52 * su).sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(8.ydp(sy)))
-                            Text(
-                                text = if (playlist.creator.isNotBlank()) "创建者：${playlist.creator}" else "${songs.size}首歌曲",
-                                color = Color(0xFFBDBDBD),
-                                fontSize = (32 * su).sp
-                            )
-                            if (playlist.description.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(8.ydp(sy)))
-                                Text(
-                                    text = playlist.description,
-                                    color = Color(0xFF8E8E93),
-                                    fontSize = (28 * su).sp,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(92.sdp(su))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "关闭",
-                                tint = Color.White,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.ydp(sy)))
-
-                    Button(
-                        onClick = onPlayAll,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6B5BFF),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 20.xdp(sx),
-                            vertical = 8.ydp(sy)
-                        ),
-                        shape = RoundedCornerShape(36.sdp(su)),
-                        modifier = Modifier.height(64.ydp(sy))
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.sdp(su)))
-                        Spacer(modifier = Modifier.width(12.xdp(sx)))
-                        Text("播放全部", fontSize = (27 * su).sp, color = Color.White)
-                    }
-
-                    Spacer(modifier = Modifier.height(14.ydp(sy)))
-                    Divider(color = Color(0xFF303036))
-                    Spacer(modifier = Modifier.height(10.ydp(sy)))
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.ydp(sy))
-                    ) {
-                        itemsIndexed(songs) { index, song ->
-                            SongListItem(song = song, onClick = { onSongClick(index) }, sx = sx, sy = sy, su = su)
-                        }
-                    }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = playlist.name,
+                    color = Color.White,
+                    fontSize = (52 * su).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(8.ydp(sy)))
+                Text(
+                    text = if (playlist.creator.isNotBlank()) "创建者：${playlist.creator}" else "${songs.size}首歌曲",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = (32 * su).sp
+                )
+                if (playlist.description.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.ydp(sy)))
+                    Text(
+                        text = playlist.description,
+                        color = Color(0xFF8E8E93),
+                        fontSize = (28 * su).sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(92.sdp(su))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "关闭",
+                    tint = Color.White,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.ydp(sy)))
+
+        Button(
+            onClick = onPlayAll,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF6B5BFF),
+                contentColor = Color.White
+            ),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = 20.xdp(sx),
+                vertical = 8.ydp(sy)
+            ),
+            shape = RoundedCornerShape(36.sdp(su)),
+            modifier = Modifier.height(64.ydp(sy))
+        ) {
+            Icon(Icons.Filled.PlayArrow, null, Modifier.size(33.sdp(su)))
+            Spacer(modifier = Modifier.width(12.xdp(sx)))
+            Text("播放全部", fontSize = (27 * su).sp, color = Color.White)
+        }
+
+        Spacer(modifier = Modifier.height(14.ydp(sy)))
+        Divider(color = Color(0xFF303036))
+        Spacer(modifier = Modifier.height(10.ydp(sy)))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.ydp(sy))
+        ) {
+            itemsIndexed(songs) { index, song ->
+                SongListItem(song = song, onClick = { onSongClick(index) }, sx = sx, sy = sy, su = su)
             }
         }
     }

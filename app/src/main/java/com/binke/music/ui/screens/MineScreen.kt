@@ -325,9 +325,7 @@ private fun PlaylistTile(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(16.sdp(su)))
-                    .background(Color(0xFF2A2A31)),
+                    .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

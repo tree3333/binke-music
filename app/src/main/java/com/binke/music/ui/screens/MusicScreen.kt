@@ -181,8 +181,6 @@ private fun PortraitMusicScreen(
     onLyricSeekToLine: (Int) -> Unit,
     sx: Float, sy: Float, su: Float
 ) {
-    var showLyrics by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -190,68 +188,104 @@ private fun PortraitMusicScreen(
             .padding(horizontal = 24.xdp(sx)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 封面/歌词切换区
+        // 封面区（固定在上半部分，不可切换，歌词在下方）
         Box(
             modifier = Modifier
-                .weight(1f)
+                .weight(1.2f)
                 .fillMaxWidth()
-                .padding(vertical = 16.ydp(sy)),
+                .padding(top = 16.ydp(sy)),
             contentAlignment = Alignment.Center
         ) {
             if (song == null) {
                 Text("暂无播放内容", color = Color.Gray, fontSize = (24 * su).sp)
-            } else if (showLyrics) {
+            } else {
+                AsyncImage(
+                    model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
+                    contentDescription = "专辑封面",
+                    modifier = Modifier
+                        .fillMaxWidth(0.65f)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(16.sdp(su))),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+
+        // 歌词区
+        if (song != null) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.ydp(sy))
+            ) {
                 LyricsView(
                     sy = sy, su = su,
                     lyrics = lyrics,
                     currentPosition = currentPosition,
                     onLineClick = onLyricSeekToLine
                 )
-            } else {
-                AsyncImage(
-                    model = song.pic.ifEmpty { "https://via.placeholder.com/600/171717/F1F1F1?text=BinKe" },
-                    contentDescription = "专辑封面",
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(16.sdp(su)))
-                        .clickable { showLyrics = true },
-                    contentScale = ContentScale.Crop
-                )
             }
         }
 
-        // 歌曲信息
+        // 歌曲信息 + 进度条 + 控制按钮
         if (song != null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = song.name,
-                    color = Color.White,
-                    fontSize = (28 * su).sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.ydp(sy)))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // 歌名歌手 + 收藏/加歌单（一行，左右对齐）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = song.quality,
-                        color = Color(0xFF9FA8FF),
-                        fontSize = (20 * su).sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.width(8.xdp(sx)))
-                    Text(
-                        text = song.artist,
-                        color = Color(0xFFBDBDBD),
-                        fontSize = (22 * su).sp,
+                        text = song.name,
+                        color = Color.White,
+                        fontSize = (30 * su).sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(4.ydp(sy)))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = song.quality,
+                            color = Color(0xFF9FA8FF),
+                            fontSize = (20 * su).sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(8.xdp(sx)))
+                        Text(
+                            text = song.artist,
+                            color = Color(0xFFBDBDBD),
+                            fontSize = (22 * su).sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.xdp(sx))) {
+                    IconButton(onClick = onAddToPlaylist, modifier = Modifier.size(72.sdp(su))) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = "加入歌单",
+                            tint = Color(0xFF9FA8FF),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(72.sdp(su))) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "收藏",
+                            tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.ydp(sy)))
+            Spacer(modifier = Modifier.height(8.ydp(sy)))
 
             // 进度条
             Slider(
@@ -273,15 +307,15 @@ private fun PortraitMusicScreen(
                 Text("剩余 ${formatRemain(duration, currentPosition)}", color = Color(0xFF8E8E93), fontSize = (18 * su).sp)
             }
 
-            Spacer(modifier = Modifier.height(16.ydp(sy)))
+            Spacer(modifier = Modifier.height(12.ydp(sy)))
 
-            // 控制按钮
+            // 5个控制按钮（放大1.5倍）
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onTogglePlayMode, modifier = Modifier.size(48.sdp(su))) {
+                IconButton(onClick = onTogglePlayMode, modifier = Modifier.size(72.sdp(su))) {
                     Icon(
                         imageVector = when (playMode) {
                             PlayMode.LIST_LOOP -> Icons.Filled.Repeat
@@ -294,7 +328,7 @@ private fun PortraitMusicScreen(
                     )
                 }
 
-                IconButton(onClick = onPrevious, modifier = Modifier.size(56.sdp(su))) {
+                IconButton(onClick = onPrevious, modifier = Modifier.size(96.sdp(su))) {
                     Icon(
                         imageVector = Icons.Filled.SkipPrevious,
                         contentDescription = "上一首",
@@ -305,7 +339,7 @@ private fun PortraitMusicScreen(
 
                 Box(
                     modifier = Modifier
-                        .size(64.sdp(su))
+                        .size(96.sdp(su))
                         .clip(CircleShape)
                         .background(Color(0xFF7B6DFF)),
                     contentAlignment = Alignment.Center
@@ -313,11 +347,11 @@ private fun PortraitMusicScreen(
                     if (isLoading) {
                         CircularProgressIndicator(
                             color = Color.White,
-                            modifier = Modifier.size(28.sdp(su)),
+                            modifier = Modifier.size(48.sdp(su)),
                             strokeWidth = 3.sdp(su)
                         )
                     } else {
-                        IconButton(onClick = onPlayPause, modifier = Modifier.size(48.sdp(su))) {
+                        IconButton(onClick = onPlayPause, modifier = Modifier.size(72.sdp(su))) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 contentDescription = if (isPlaying) "暂停" else "播放",
@@ -328,7 +362,7 @@ private fun PortraitMusicScreen(
                     }
                 }
 
-                IconButton(onClick = onNext, modifier = Modifier.size(56.sdp(su))) {
+                IconButton(onClick = onNext, modifier = Modifier.size(96.sdp(su))) {
                     Icon(
                         imageVector = Icons.Filled.SkipNext,
                         contentDescription = "下一首",
@@ -337,49 +371,12 @@ private fun PortraitMusicScreen(
                     )
                 }
 
-                IconButton(onClick = onOpenQueue, modifier = Modifier.size(48.sdp(su))) {
+                IconButton(onClick = onOpenQueue, modifier = Modifier.size(72.sdp(su))) {
                     Icon(
                         imageVector = Icons.Filled.QueueMusic,
                         contentDescription = "播放列表",
                         tint = Color.White,
                         modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.ydp(sy)))
-
-            // 收藏/加歌单/歌词切换
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                IconButton(onClick = onAddToPlaylist, modifier = Modifier.size(44.sdp(su))) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "加入歌单",
-                        tint = Color(0xFF9FA8FF),
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(44.sdp(su))) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = "收藏",
-                        tint = if (isFavorite) Color(0xFFFF4D67) else Color.White,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                IconButton(
-                    onClick = { showLyrics = !showLyrics },
-                    modifier = Modifier.size(44.sdp(su))
-                ) {
-                    Text(
-                        text = if (showLyrics) "封面" else "歌词",
-                        color = Color(0xFF9FA8FF),
-                        fontSize = (18 * su).sp
                     )
                 }
             }

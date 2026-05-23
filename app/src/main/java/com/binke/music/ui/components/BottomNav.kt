@@ -54,7 +54,7 @@ fun BottomNav(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.ydp(sy))
+            .height(140.ydp(sy))
             .background(Color(0xFF161616)),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
@@ -66,18 +66,18 @@ fun BottomNav(
                     .clickable { onTabSelected(index) }
                     .padding(horizontal = 24.xdp(sx)),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.ydp(sy))
+                verticalArrangement = Arrangement.spacedBy(6.ydp(sy))
             ) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
                     tint = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
-                    modifier = Modifier.size(40.sdp(su))
+                    modifier = Modifier.size(80.sdp(su))
                 )
                 Text(
                     text = item.label,
                     color = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
-                    fontSize = (20 * su).sp
+                    fontSize = (40 * su).sp
                 )
             }
         }
