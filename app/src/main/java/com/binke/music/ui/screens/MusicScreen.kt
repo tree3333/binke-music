@@ -282,7 +282,7 @@ fun MusicScreen(
                             modifier = Modifier
                                 .size(68.sdp(su))
                                 .constrainAs(playModeRef) {
-                                    top.linkTo(timeRowRef.bottom, margin = 4.ydp(sy))
+                                    top.linkTo(timeRowRef.bottom, margin = (-44).ydp(sy))
                                     start.linkTo(parent.start)
                                 }
                         ) {
