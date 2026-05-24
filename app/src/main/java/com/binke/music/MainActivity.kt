@@ -278,7 +278,11 @@ fun MainScreen(viewModel: MainViewModel) {
                             .padding(horizontal = 16.xdp(sx)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "搜索",
@@ -286,27 +290,22 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.size(44.sdp(su))
                             )
                             Spacer(modifier = Modifier.width(10.xdp(sx)))
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                BasicTextField(
-                                    value = searchInput,
-                                    onValueChange = {
-                                        searchInput = it
-                                        viewModel.updateSearchQuery(it)
-                                    },
-                                    textStyle = TextStyle(color = Color.White, fontSize = (29 * su).sp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    decorationBox = { innerTextField ->
-                                        if (searchInput.isEmpty()) {
-                                            Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (29 * su).sp)
-                                        }
-                                        innerTextField()
+                            BasicTextField(
+                                value = searchInput,
+                                onValueChange = {
+                                    searchInput = it
+                                    viewModel.updateSearchQuery(it)
+                                },
+                                textStyle = TextStyle(color = Color.White, fontSize = (29 * su).sp),
+                                modifier = Modifier.weight(1f, fill = false),
+                                singleLine = true,
+                                decorationBox = { innerTextField ->
+                                    if (searchInput.isEmpty()) {
+                                        Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (29 * su).sp)
                                     }
-                                )
-                            }
+                                    innerTextField()
+                                }
+                            )
                             if (searchInput.isNotEmpty()) {
                                 Spacer(modifier = Modifier.width(6.xdp(sx)))
                                 IconButton(

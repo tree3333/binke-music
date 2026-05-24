@@ -641,8 +641,12 @@ class MainViewModel(
         }
 
         autoSearchJob = viewModelScope.launch {
+            val currentQuery = query
             delay(350)
-            searchInternal(query, saveHistory = false)
+            // delay 期间如果 query 变了，忽略此次结果
+            if (currentQuery == _searchQuery.value) {
+                searchInternal(currentQuery, saveHistory = false)
+            }
         }
     }
 
