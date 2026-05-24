@@ -196,6 +196,10 @@ class MusicPlayer(private val context: Context) {
         player = null
     }
 
+    fun setRepeatMode(mode: Int) {
+        player?.repeatMode = mode
+    }
+
     companion object {
         private const val TAG = "MusicPlayer"
     }

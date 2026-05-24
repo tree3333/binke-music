@@ -11,6 +11,7 @@ import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.data.repository.MusicRepository
 import com.binke.music.player.MusicPlayer
+import com.binke.music.player.SongCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -30,6 +31,8 @@ class MainViewModel(
     private val repository: MusicRepository,
     private val musicPlayer: MusicPlayer
 ) : ViewModel() {
+
+    private val songCache = SongCache.getInstance(apiService)
 
     private val _currentPage = MutableStateFlow(Page.HOME)
     val currentPage: StateFlow<Page> = _currentPage.asStateFlow()
@@ -155,7 +158,13 @@ class MainViewModel(
             _playbackDebugParams.value = buildPlaybackParams(_currentSong.value?.playUrl)
         }
         musicPlayer.onTrackEnded = {
-            next()
+            // SINGLE_LOOP 时让 ExoPlayer 自己处理（REPEAT_MODE_ONE），无需重新 playSong
+            if (_playMode.value == PlayMode.SINGLE_LOOP) {
+                musicPlayer.seekTo(0)
+                musicPlayer.resume()
+            } else {
+                next()
+            }
         }
 
         viewModelScope.launch {
@@ -299,11 +308,19 @@ class MainViewModel(
     }
 
     fun togglePlayMode() {
-        _playMode.value = when (_playMode.value) {
+        val newMode = when (_playMode.value) {
             PlayMode.LIST_LOOP -> PlayMode.SINGLE_LOOP
             PlayMode.SINGLE_LOOP -> PlayMode.SHUFFLE
             PlayMode.SHUFFLE -> PlayMode.LIST_LOOP
         }
+        _playMode.value = newMode
+        // 同步 ExoPlayer repeat mode（修复单曲循环不生效）
+        musicPlayer.setRepeatMode(
+            when (newMode) {
+                PlayMode.SINGLE_LOOP -> androidx.media3.common.Player.REPEAT_MODE_ONE
+                else -> androidx.media3.common.Player.REPEAT_MODE_OFF
+            }
+        )
     }
 
     fun seekTo(position: Long) {
@@ -334,69 +351,36 @@ class MainViewModel(
             refreshHistory()
 
             try {
-                // 先拿播放地址（blocking）
-                val playDeferred = viewModelScope.async(Dispatchers.IO) {
-                    apiService.getPlayUrl(song.musicRid)
+                // 缓存优先，并发加载播放地址
+                val playUrlDeferred = viewModelScope.async(Dispatchers.IO) {
+                    val cached = songCache.get(song)
+                    if (cached?.playUrl != null) {
+                        cached.playUrl
+                    } else {
+                        val url = apiService.getPlayUrl(song.musicRid).url
+                        // 回填缓存（后台异步）
+                        songCache.preloadPlayUrls(listOf(song))
+                        url
+                    }
                 }
-                val result = playDeferred.await()
-                val playUrl = result.url
+                val result = playUrlDeferred.await()
+                val playUrl = result
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
                     song.playUrl = playUrl
                     musicPlayer.play(playUrl)
                     _isPlaying.value = true
+                    // 开始播放后预加载接下来的 3 首
+                    preloadUpcoming()
                 } else {
                     _playbackDebugParams.value = buildPlaybackParams(null)
-                    _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${result.debugInfo}"
+                    _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${apiService.getPlayUrl(song.musicRid).debugInfo}"
                 }
 
                 // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
-                // Bug1 fix: 失败重试 + songId 校验
+                // 歌词也从缓存读（缓存会后台更新）
                 lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                    val currentSongId = song.rid.toString()
-                    var lyrics: List<LrcLine> = emptyList()
-
-                    // 酷我歌词，最多重试2次
-                    var kr = apiService.getLyrics(currentSongId)
-                    for (attempt in 0..2) {
-                        if (kr.isSuccess) {
-                            lyrics = kr.getOrNull() ?: emptyList()
-                            if (lyrics.isNotEmpty()) break
-                        }
-                        if (attempt < 2) delay(500)
-                        ensureActive()
-                        if (attempt < 2) kr = apiService.getLyrics(currentSongId)
-                    }
-
-                    // 酷我为空，尝试 QQ 歌词（最多重试2次）
-                    if (lyrics.isEmpty()) {
-                        var qr = apiService.searchLyricsQQ(song.name, song.artist)
-                        for (attempt in 0..2) {
-                            if (qr.isSuccess) {
-                                val qq = qr.getOrNull() ?: emptyList()
-                                if (qq.isNotEmpty()) { lyrics = qq; break }
-                            }
-                            if (attempt < 2) delay(500)
-                            ensureActive()
-                            if (attempt < 2) qr = apiService.searchLyricsQQ(song.name, song.artist)
-                        }
-                    }
-
-                    // QQ 也为空，尝试网易云歌词（最多重试2次）
-                    if (lyrics.isEmpty()) {
-                        var nr = apiService.searchLyricsNetEase(song.name, song.artist)
-                        for (attempt in 0..2) {
-                            if (nr.isSuccess) {
-                                val ne = nr.getOrNull() ?: emptyList()
-                                if (ne.isNotEmpty()) { lyrics = ne; break }
-                            }
-                            if (attempt < 2) delay(500)
-                            ensureActive()
-                            if (attempt < 2) nr = apiService.searchLyricsNetEase(song.name, song.artist)
-                        }
-                    }
-
-                    // Bug2 fix: cancel 后 isActive 为 false，不再写入
+                    val lyrics = songCache.loadLyrics(song)
                     if (isActive) _lyrics.value = lyrics
                 }
             } catch (e: Exception) {
@@ -404,6 +388,44 @@ class MainViewModel(
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    /**
+     * 预加载接下来最多 3 首的播放地址和歌词。
+     * 首次播放时调用以填充缓存；切歌时只追加新增的条目。
+     */
+    private fun preloadUpcoming() {
+        val playlist = _playlist.value
+        val currentIdx = _currentIndex.value
+        if (playlist.isEmpty()) return
+
+        val upcoming = mutableListOf<Song>()
+        val size = playlist.size
+
+        when (_playMode.value) {
+            PlayMode.SINGLE_LOOP -> {
+                // 单曲循环：只有当前这首，无需预加载下一首
+                return
+            }
+            PlayMode.SHUFFLE -> {
+                // 随机模式不知道具体下一首，随机取未缓存的 3 首
+                upcoming.addAll(playlist.filter { songCache.get(it) == null }.take(3))
+            }
+            PlayMode.LIST_LOOP -> {
+                for (offset in 1..3) {
+                    val idx = (currentIdx + offset) % size
+                    val song = playlist[idx]
+                    if (songCache.get(song) == null) {
+                        upcoming.add(song)
+                    }
+                }
+            }
+        }
+
+        if (upcoming.isNotEmpty()) {
+            songCache.preloadPlayUrls(upcoming)
+            upcoming.forEach { songCache.preloadLyrics(it) }
         }
     }
 
