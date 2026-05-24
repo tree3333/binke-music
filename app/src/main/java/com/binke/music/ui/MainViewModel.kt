@@ -371,8 +371,11 @@ class MainViewModel(
         // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
         lyricsJob?.cancel()
 
-        // 立即预加载当前歌曲封面（添加到 preloadedCoverUrls，确保下次命中检测生效）
-        songCache.preloadPics(listOf(song))
+        // 立即同步预加载当前歌曲封面（等待 Bitmap 真正解码完成后才返回）
+        // 确保 toast 触发时图片已可直接渲染，不会回到 AsyncImage 重新 decode
+        viewModelScope.launch(Dispatchers.IO) {
+            songCache.awaitPendingBitmaps(listOf(song))
+        }
 
         viewModelScope.launch {
             _isLoading.value = true

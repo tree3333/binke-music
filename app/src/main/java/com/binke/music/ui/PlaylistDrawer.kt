@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.player.SongCache
@@ -332,17 +331,17 @@ private fun CachedCoverImage(
     val songCache = remember { SongCache.getInstance() }
     val ctx = songCache?.let { SongCache.getAppContext() }
 
-    // 命中判断：URL 已在 preloadedCoverUrls，或 Coil memoryCache 已有 bitmap
+    // 命中判断：URL 已在 preloadedCoverUrls 且 Bitmap 已解码，或 Coil memoryCache 已有 bitmap
+    val cachedBitmap = song.id.let { songCache?.getCoverBitmap(it) }
     val isCached = song.pic.isNotBlank() && (
-        songCache?.hasCover(song) == true ||
+        (songCache?.hasCover(song) == true && cachedBitmap != null) ||
         (ctx != null && SongCache.getImageLoader()?.memoryCache?.let { mc ->
-            val req = ImageRequest.Builder(ctx).data(song.pic).build()
+            val req = coil.request.ImageRequest.Builder(ctx).data(song.pic).build()
             req.memoryCacheKey?.let { mc.get(it) != null } ?: false
         } == true)
     )
 
     if (isCached) {
-        val cachedBitmap = song.id.let { songCache?.getCoverBitmap(it) }
         if (cachedBitmap != null) {
             Image(
                 bitmap = cachedBitmap.asImageBitmap(),
@@ -351,7 +350,7 @@ private fun CachedCoverImage(
                 contentScale = contentScale
             )
         } else {
-            // Bitmap 还没解码完，但 URL 已标记，走 AsyncImage 从 Coil 缓存渲染
+            // URL 在 Coil 内存缓存中，直接读取（无需网络）
             AsyncImage(
                 model = song.pic,
                 contentDescription = null,
