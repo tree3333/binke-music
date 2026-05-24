@@ -266,13 +266,13 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.9f)
+                        .fillMaxWidth()
                         .padding(horizontal = 12.xdp(sx), vertical = 10.ydp(sy)),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.TopCenter
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(0.9f)
                             .height(56.sdp(su))
                             .background(Color(0xFF26262B), RoundedCornerShape(16.sdp(su)))
                             .padding(horizontal = 16.xdp(sx)),
@@ -313,13 +313,13 @@ fun MainScreen(viewModel: MainViewModel) {
                                         searchInput = ""
                                         viewModel.updateSearchQuery("")
                                     },
-                                    modifier = Modifier.size(24.sdp(su))
+                                    modifier = Modifier.size(44.sdp(su))
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Close,
                                         contentDescription = "清除",
                                         tint = Color(0xFF8E8E93),
-                                        modifier = Modifier.size(20.sdp(su))
+                                        modifier = Modifier.size(44.sdp(su))
                                     )
                                 }
                             }
