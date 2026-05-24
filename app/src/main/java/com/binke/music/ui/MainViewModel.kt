@@ -224,15 +224,27 @@ class MainViewModel(
                 apiService.getPlaylistDetail(playlistId, rn = 100)
             }
             if (detail != null) {
-                // 封面增强：iTunes → 网易云 → 酷我兜底
-                val enhancedSongs = withContext(Dispatchers.IO) {
-                    detail.musicList.map { song ->
+                // 推荐歌单抽屉内的歌曲列表直接用 Kuwo 原生封面，不做 iTunes/网易云增强（快）
+                _drawerPlaylist.value = detail
+                _drawerSongs.value = detail.musicList
+            }
+        }
+    }
+
+    fun playPlaylist(playlist: Playlist, startIndex: Int = 0) {
+        viewModelScope.launch {
+            // 始终做封面增强（iTunes → 网易云 → 酷我兜底），确保播放时封面质量最高
+            val rawSongs = playlist.musicList.takeIf { it.isNotEmpty() }
+                ?: withContext(Dispatchers.IO) {
+                    apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
+                }
+            val songs = if (rawSongs.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    rawSongs.map { song ->
                         async {
                             if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                                // 1. 优先 iTunes
                                 val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
                                 if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
-                                // 2. 其次网易云
                                 val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
                                 if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
                             }
@@ -240,49 +252,8 @@ class MainViewModel(
                         }
                     }.awaitAll()
                 }
-                _drawerPlaylist.value = detail.copy(musicList = enhancedSongs)
-                _drawerSongs.value = enhancedSongs
-                // 如果 _playlist 正在播放本歌单，同步增强后的封面（iTunes → 网易云 → 酷我）到 _playlist
-                if (_playlist.value.isNotEmpty()) {
-                    val enhancedMap = enhancedSongs.associateBy { it.id }
-                    val synced = _playlist.value.map { song -> enhancedMap[song.id] ?: song }
-                    if (synced.any { s -> s.pic != _playlist.value.find { p -> p.id == s.id }?.pic }) {
-                        _playlist.value = synced
-                    }
-                }
-            }
-        }
-    }
-
-    fun playPlaylist(playlist: Playlist, startIndex: Int = 0) {
-        viewModelScope.launch {
-            // 优先用已增强好的 _drawerSongs，保持封面顺序：iTunes → 网易云 → 酷我
-            val drawerSongs = _drawerSongs.value
-            val songs = if (drawerSongs.isNotEmpty()) {
-                drawerSongs
             } else {
-                // 未开过抽屉，同步做封面增强（iTunes → 网易云 → 酷我兜底），确保预加载和UI用同一个URL
-                val rawSongs = playlist.musicList.takeIf { it.isNotEmpty() }
-                    ?: withContext(Dispatchers.IO) {
-                        apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
-                    }
-                if (rawSongs.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        rawSongs.map { song ->
-                            async {
-                                if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                                    val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                                    if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
-                                    val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                                    if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
-                                }
-                                song
-                            }
-                        }.awaitAll()
-                    }
-                } else {
-                    rawSongs
-                }
+                rawSongs
             }
             if (songs.isNotEmpty()) {
                 _playlist.value = songs
@@ -290,7 +261,6 @@ class MainViewModel(
                 _playlistSource.value = PlaylistSource.NONE
                 closePlaylistDrawer()
                 setTab(1)
-                // playSongAt 之前先同步预加载当前歌曲封面，确保 CachedCoverImage 渲染时 Bitmap 已就绪
                 SongCache.getAppContext()?.let { songCache.awaitPendingBitmaps(listOf(songs[startIndex.coerceIn(0, songs.lastIndex)])) }
                 playSongAt(_currentIndex.value)
             }
@@ -698,23 +668,8 @@ class MainViewModel(
                 android.util.Log.d("SearchDebug", "searchSongs($query) returned ${raw.size} results")
                 raw
             }
-            // 封面增强：iTunes → 网易云 → 酷我兜底
-            val enhanced = withContext(Dispatchers.IO) {
-                results.map { song ->
-                    async {
-                        if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                            // 1. 优先 iTunes
-                            val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                            if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
-                            // 2. 其次网易云
-                            val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                            if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
-                        }
-                        song
-                    }
-                }.awaitAll()
-            }
-            _searchResults.value = enhanced
+            // 搜索结果列表直接用 Kuwo 原生封面（web_albumpic_short / web_artistpic_short），不做 iTunes/网易云增强
+            _searchResults.value = results
         } finally {
             _isSearching.value = false
         }
