@@ -139,20 +139,20 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
-     * 预加载封面图片（后台，触发全局 ImageLoader 加载到内存缓存）。
-     * BinkeMusicApp 已全局配置 memoryCachePolicy=ENABLED / diskCachePolicy=DISABLED，
-     * 此处直接用 ImageLoader(context) 即可命中同一缓存池。
+     * 预加载封面图片（后台，等待图片真正缓存到内存后再返回）。
+     * 使用 SongCache.getImageLoader() 获取与 AsyncImage 同一个实例，保证缓存命中。
      */
-    fun preloadPics(context: Context, songs: List<Song>) {
-        val imageLoader = ImageLoader(context)
+    fun preloadPics(songs: List<Song>) {
+        val loader = getImageLoader() ?: return
+        val ctx = getAppContext() ?: return
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
             scope.launch {
-                val request = ImageRequest.Builder(context)
+                val request = ImageRequest.Builder(ctx)
                     .data(picUrl)
                     .build()
-                imageLoader.execute(request)
+                loader.execute(request)
             }
         }
     }
@@ -163,6 +163,9 @@ class SongCache(private val apiService: KuwoApiService) {
 
         private var appContext: Context? = null
 
+        /** 指向 BinkeMusicApp 单例，与 AsyncImage 共用同一 ImageLoader，保证缓存命中 */
+        private var imageLoader: ImageLoader? = null
+
         fun getInstance(apiService: KuwoApiService): SongCache {
             return instance ?: synchronized(this) {
                 instance ?: SongCache(apiService).also { instance = it }
@@ -171,8 +174,29 @@ class SongCache(private val apiService: KuwoApiService) {
 
         fun setAppContext(context: Context) {
             appContext = context.applicationContext
+            // 直接取 BinkeMusicApp 已通过 ImageLoaderFactory 配置好的单例
+            val app = context.applicationContext as? com.binke.music.BinkeMusicApp
+            imageLoader = app?.let {
+                coil.ImageLoader.Builder(it)
+                    .memoryCache {
+                        coil.memory.MemoryCache.Builder(it)
+                            .maxSizePercent(0.25)
+                            .build()
+                    }
+                    .diskCache {
+                        coil.disk.DiskCache.Builder()
+                            .directory(it.cacheDir.resolve("image_cache"))
+                            .maxSizeBytes(0L)
+                            .build()
+                    }
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.DISABLED)
+                    .crossfade(true)
+                    .build()
+            }
         }
 
         fun getAppContext(): Context? = appContext
+        fun getImageLoader(): ImageLoader? = imageLoader
     }
 }

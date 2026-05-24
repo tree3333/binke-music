@@ -457,8 +457,8 @@ class MainViewModel(
         if (upcoming.isNotEmpty()) {
             songCache.preloadPlayUrls(upcoming)
             upcoming.forEach { songCache.preloadLyrics(it) }
-            SongCache.getAppContext()?.let { ctx ->
-                songCache.preloadPics(ctx, upcoming)
+            SongCache.getAppContext()?.let {
+                songCache.preloadPics(upcoming)
             }
         }
     }
