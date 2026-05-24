@@ -239,12 +239,12 @@ fun MainScreen(viewModel: MainViewModel) {
     val playbackError by viewModel.playbackError.collectAsState()
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
 
-    // 缓存调试 toast
+    // 缓存调试 toast（只展示命中项），显示后立即清空以便下次触发
     val ctx = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(cacheToast) {
-        cacheToast?.let {
-            Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show()
-        }
+        val msg = cacheToast ?: return@LaunchedEffect
+        Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+        viewModel.clearCacheToast()
     }
 
     val cfg = LocalConfiguration.current

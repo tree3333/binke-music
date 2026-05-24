@@ -29,7 +29,12 @@ class SongCache(private val apiService: KuwoApiService) {
     // 缓存 key 使用 Song.id（rid.toString()）
     private val cache = mutableMapOf<String, Entry>()
 
+    // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空
+    val pendingHits = mutableListOf<String>()
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    fun clearPendingHits() = pendingHits.clear()
 
     /** 同步获取，已命中缓存返回 Entry，否则返回 null */
     fun get(song: Song): Entry? = cache[song.id]
@@ -141,17 +146,24 @@ class SongCache(private val apiService: KuwoApiService) {
     /**
      * 预加载封面图片（后台，等待图片真正缓存到内存后再返回）。
      * 使用 SongCache.getImageLoader() 获取与 AsyncImage 同一个实例，保证缓存命中。
+     * 加载前检查 Coil 内存缓存是否已有，命中则记入 pendingHits。
      */
     fun preloadPics(songs: List<Song>) {
         val loader = getImageLoader() ?: return
         val ctx = getAppContext() ?: return
+        val memoryCache = loader.memoryCache
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
+            // 检查 Coil 内存缓存是否已有此封面
+            val request = ImageRequest.Builder(ctx).data(picUrl).build()
+            val cacheKey = request.memoryCacheKey
+            val cachedBitmap = memoryCache?.get(cacheKey)
+            if (cachedBitmap != null) {
+                pendingHits.add("封面命中缓存")
+                return@forEach
+            }
             scope.launch {
-                val request = ImageRequest.Builder(ctx)
-                    .data(picUrl)
-                    .build()
                 loader.execute(request)
             }
         }
