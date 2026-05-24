@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -231,6 +232,7 @@ private fun PlaylistDrawerContent(
         // 播放全部：比字多 20%，按钮拉长与歌单列表同宽
         Button(
             onClick = onPlayAll,
+            contentPadding = PaddingValues(vertical = (30 * 0.1f * su).dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFF6B5BFF),
                 contentColor = Color.White
@@ -271,8 +273,9 @@ private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, 
             .padding(14.sdp(su)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CachedCoverImage(
-            song = song,
+        AsyncImage(
+            model = song.pic.ifEmpty { "https://via.placeholder.com/120/1D1D21/8E8E93?text=♪" },
+            contentDescription = null,
             modifier = Modifier
                 .size(coverSize)
                 .clip(RoundedCornerShape(10.sdp(su))),
