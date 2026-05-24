@@ -91,36 +91,38 @@ fun SearchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.sdp(su)),
+                    .padding(horizontal = 12.xdp(sx), vertical = 10.ydp(sy)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(56.sdp(su))) {
-                    Icon(Icons.Filled.ArrowBack, "返回", modifier = Modifier.size(24.sdp(su)), tint = Color.White)
+                IconButton(onClick = onBack, modifier = Modifier.size(48.sdp(su))) {
+                    Icon(Icons.Filled.ArrowBack, "返回", modifier = Modifier.size(22.sdp(su)), tint = Color.White)
                 }
+
+                Spacer(modifier = Modifier.width(8.xdp(sx)))
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(56.ydp(sy))
-                        .background(Color(0xFF2A2A2A), RoundedCornerShape(28.sdp(su)))
-                        .padding(horizontal = 20.xdp(sx)),
+                        .height(48.sdp(su))
+                        .background(Color(0xFF2A2A2A), RoundedCornerShape(16.sdp(su)))
+                        .padding(horizontal = 14.xdp(sx)),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Search, "搜索", modifier = Modifier.size(24.sdp(su)), tint = Color.Gray)
-                        Spacer(modifier = Modifier.width(12.xdp(sx)))
+                        Icon(Icons.Filled.Search, "搜索", modifier = Modifier.size(20.sdp(su)), tint = Color.Gray)
+                        Spacer(modifier = Modifier.width(10.xdp(sx)))
                         BasicTextField(
                             value = inputText,
                             onValueChange = {
                                 inputText = it
                                 onQueryChange(it)
                             },
-                            textStyle = TextStyle(color = Color.White, fontSize = (18 * su).sp),
+                            textStyle = TextStyle(color = Color.White, fontSize = (16 * su).sp),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             decorationBox = { innerTextField ->
                                 if (inputText.isEmpty()) {
-                                    Text("搜索歌手、歌曲名称、专辑", color = Color(0xFF77777C), fontSize = (18 * su).sp)
+                                    Text("搜索歌手、歌曲、专辑", color = Color(0xFF77777C), fontSize = (16 * su).sp)
                                 }
                                 innerTextField()
                             }
@@ -128,21 +130,21 @@ fun SearchScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.xdp(sx)))
+                Spacer(modifier = Modifier.width(8.xdp(sx)))
 
                 Box(
                     modifier = Modifier
-                        .width(180.xdp(sx))
-                        .height(56.ydp(sy))
-                        .clip(RoundedCornerShape(28.sdp(su)))
+                        .height(48.sdp(su))
+                        .clip(RoundedCornerShape(16.sdp(su)))
                         .background(Color(0xFF6B5BFF))
-                        .clickable { onSearch(inputText) },
+                        .clickable { onSearch(inputText) }
+                        .padding(horizontal = 20.xdp(sx)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "搜索",
                         color = Color.White,
-                        fontSize = (27 * su).sp,
+                        fontSize = (16 * su).sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )

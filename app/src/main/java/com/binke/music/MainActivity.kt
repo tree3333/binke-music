@@ -265,16 +265,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.xdp(sx), vertical = 8.ydp(sy))
-                        .height(56.ydp(sy)),
+                        .padding(horizontal = 12.xdp(sx), vertical = 10.ydp(sy)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .background(Color(0xFF26262B), RoundedCornerShape(28.sdp(su)))
-                            .padding(horizontal = 16.xdp(sx)),
+                            .height(48.sdp(su))
+                            .background(Color(0xFF26262B), RoundedCornerShape(16.sdp(su)))
+                            .padding(horizontal = 14.xdp(sx)),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -282,21 +281,21 @@ fun MainScreen(viewModel: MainViewModel) {
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "搜索",
                                 tint = Color(0xFF8E8E93),
-                                modifier = Modifier.size(24.sdp(su))
+                                modifier = Modifier.size(20.sdp(su))
                             )
-                            Spacer(modifier = Modifier.width(8.xdp(sx)))
+                            Spacer(modifier = Modifier.width(10.xdp(sx)))
                             BasicTextField(
                                 value = searchInput,
                                 onValueChange = {
                                     searchInput = it
                                     viewModel.updateSearchQuery(it)
                                 },
-                                textStyle = TextStyle(color = Color.White, fontSize = (18 * su).sp),
+                                textStyle = TextStyle(color = Color.White, fontSize = (16 * su).sp),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 decorationBox = { innerTextField ->
                                     if (searchInput.isEmpty()) {
-                                        Text("搜索歌手、歌曲名称", color = Color(0xFF8E8E93), fontSize = (18 * su).sp)
+                                        Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (16 * su).sp)
                                     }
                                     innerTextField()
                                 }
@@ -307,15 +306,14 @@ fun MainScreen(viewModel: MainViewModel) {
                                     onClick = {
                                         searchInput = ""
                                         viewModel.updateSearchQuery("")
-                                        viewModel.navigateTo(Page.HOME)
                                     },
-                                    modifier = Modifier.size(28.sdp(su))
+                                    modifier = Modifier.size(24.sdp(su))
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Close,
                                         contentDescription = "清除",
                                         tint = Color(0xFF8E8E93),
-                                        modifier = Modifier.size(20.sdp(su))
+                                        modifier = Modifier.size(16.sdp(su))
                                     )
                                 }
                             }
@@ -324,14 +322,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     Spacer(modifier = Modifier.width(8.xdp(sx)))
                     Box(
                         modifier = Modifier
-                            .width(120.xdp(sx))
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(28.sdp(su)))
+                            .height(48.sdp(su))
+                            .clip(RoundedCornerShape(16.sdp(su)))
                             .background(Color(0xFF6B5BFF))
-                            .clickable { viewModel.search(searchInput) },
+                            .clickable { viewModel.search(searchInput) }
+                            .padding(horizontal = 20.xdp(sx)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("搜索", color = Color.White, fontSize = (22 * su).sp, fontWeight = FontWeight.Bold)
+                        Text("搜索", color = Color.White, fontSize = (16 * su).sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
