@@ -1,6 +1,7 @@
 package com.binke.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,8 +55,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.binke.music.R
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
+import kotlinx.coroutines.delay
 
 private const val BASE_WIDTH_DP = 1920f
 private const val BASE_HEIGHT_DP = 1080f
@@ -147,6 +154,11 @@ fun MineScreen(
             verticalArrangement = Arrangement.spacedBy(18.ydp(sy)),
             modifier = Modifier.fillMaxSize()
         ) {
+            // 轮播图（最顶部，占满整行）
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                BannerCarousel(sx = sx, sy = sy, su = su)
+            }
+
             items(tiles) { playlist ->
                 PlaylistTile(
                     playlist = playlist,
@@ -395,6 +407,52 @@ private fun AddPlaylistTile(onClick: () -> Unit, sy: Float, su: Float) {
             )
             Spacer(modifier = Modifier.height(16.ydp(sy)))
             Text("新增歌单", color = Color.White, fontSize = (32 * su).sp)
+        }
+    }
+}
+
+@Composable
+private fun BannerCarousel(sx: Float, sy: Float, su: Float) {
+    val bannerResIds = listOf(R.drawable.banner_1, R.drawable.banner_2)
+    var currentIndex by remember { mutableIntStateOf(0) }
+
+    // 3秒自动切换
+    LaunchedEffect(currentIndex) {
+        delay(3000)
+        currentIndex = (currentIndex + 1) % bannerResIds.size
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1080f / 720f)
+            .clip(RoundedCornerShape(12.sdp(su))),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = bannerResIds[currentIndex]),
+            contentDescription = "轮播图${currentIndex + 1}",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        // 指示器（底部居中）
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.ydp(sy)),
+            horizontalArrangement = Arrangement.spacedBy(8.xdp(sx))
+        ) {
+            bannerResIds.forEachIndexed { index, _ ->
+                Box(
+                    modifier = Modifier
+                        .size(width = if (index == currentIndex) 20.xdp(sx) else 8.xdp(sx), height = 8.ydp(sy))
+                        .clip(CircleShape)
+                        .background(
+                            if (index == currentIndex) Color(0xFF7B6DFF) else Color(0x80FFFFFF)
+                        )
+                )
+            }
         }
     }
 }

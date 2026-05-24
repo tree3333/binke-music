@@ -94,11 +94,6 @@ fun HomeScreen(
                 contentPadding = PaddingValues(24.xdp(sx), 24.ydp(sy)),
                 verticalArrangement = Arrangement.spacedBy(28.ydp(sy))
             ) {
-                // 轮播图（最顶部）
-                item {
-                    BannerCarousel(sx = sx, sy = sy, su = su)
-                }
-
                 // 搜索结果区块（竖屏内联搜索时显示）
                 if (searchResults.isNotEmpty()) {
                     item {
@@ -278,52 +273,6 @@ private fun SearchResultItemHome(song: Song, onClick: () -> Unit, sx: Float, sy:
                 color = Color(0xFFBDBDBD),
                 fontSize = (28 * su).sp
             )
-        }
-    }
-}
-
-@Composable
-private fun BannerCarousel(sx: Float, sy: Float, su: Float) {
-    val bannerResIds = listOf(R.drawable.banner_1, R.drawable.banner_2)
-    var currentIndex by remember { mutableIntStateOf(0) }
-
-    // 3秒自动切换
-    LaunchedEffect(currentIndex) {
-        delay(3000)
-        currentIndex = (currentIndex + 1) % bannerResIds.size
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1080f / 720f)
-            .clip(RoundedCornerShape(12.sdp(su))),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(id = bannerResIds[currentIndex]),
-            contentDescription = "轮播图${currentIndex + 1}",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        // 指示器（底部居中）
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 8.ydp(sy)),
-            horizontalArrangement = Arrangement.spacedBy(8.xdp(sx))
-        ) {
-            bannerResIds.forEachIndexed { index, _ ->
-                Box(
-                    modifier = Modifier
-                        .size(width = if (index == currentIndex) 20.xdp(sx) else 8.xdp(sx), height = 8.ydp(sy))
-                        .clip(CircleShape)
-                        .background(
-                            if (index == currentIndex) Color(0xFF7B6DFF) else Color(0x80FFFFFF)
-                        )
-                )
-            }
         }
     }
 }
