@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -296,6 +295,8 @@ class MainViewModel(
                 _playlistSource.value = PlaylistSource.NONE
                 closePlaylistDrawer()
                 setTab(1)
+                // playSongAt 之前先同步预加载当前歌曲封面，确保 CachedCoverImage 渲染时 Bitmap 已就绪
+                SongCache.getAppContext()?.let { songCache.awaitPendingBitmaps(listOf(songs[startIndex.coerceIn(0, songs.lastIndex)])) }
                 playSongAt(_currentIndex.value)
             }
         }
@@ -371,12 +372,6 @@ class MainViewModel(
     fun playSong(song: Song) {
         // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
         lyricsJob?.cancel()
-
-        // 立即同步预加载当前歌曲封面（等待 Bitmap 真正解码完成后才继续）
-        // 放在主协程第一步，确保 toast 触发时图片已可直接渲染，不会回到 AsyncImage 重新 decode
-        runBlocking(Dispatchers.IO) {
-            songCache.awaitPendingBitmaps(listOf(song))
-        }
 
         viewModelScope.launch {
             _isLoading.value = true
