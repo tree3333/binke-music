@@ -231,41 +231,49 @@ private fun PortraitMusicScreen(
 
         // 歌曲信息 + 进度条 + 控制按钮
         if (song != null) {
-            // 歌名歌手 + 收藏/加歌单（一行，左右对齐）
+            // 上排：5槽位对齐，槽位1-3=歌名/音质/歌手，槽位4=加入歌单，槽位5=收藏
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.name,
-                        color = Color.White,
-                        fontSize = (30 * su).sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.ydp(sy)))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // 槽位1-3：歌名+歌手（占3份宽度）
+                Box(
+                    modifier = Modifier.weight(3f),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Column {
                         Text(
-                            text = song.quality,
-                            color = Color(0xFF9FA8FF),
-                            fontSize = (20 * su).sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.width(8.xdp(sx)))
-                        Text(
-                            text = song.artist,
-                            color = Color(0xFFBDBDBD),
-                            fontSize = (22 * su).sp,
+                            text = song.name,
+                            color = Color.White,
+                            fontSize = (30 * su).sp,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(4.ydp(sy)))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = song.quality,
+                                color = Color(0xFF9FA8FF),
+                                fontSize = (20 * su).sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.width(8.xdp(sx)))
+                            Text(
+                                text = song.artist,
+                                color = Color(0xFFBDBDBD),
+                                fontSize = (22 * su).sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.xdp(sx))) {
+                // 槽位4：加入歌单（占1份宽度，居中）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
                     IconButton(onClick = onAddToPlaylist, modifier = Modifier.size(72.sdp(su))) {
                         Icon(
                             imageVector = Icons.Filled.Add,
@@ -274,7 +282,12 @@ private fun PortraitMusicScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-
+                }
+                // 槽位5：收藏（占1份宽度，居中）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
                     IconButton(onClick = onToggleFavorite, modifier = Modifier.size(72.sdp(su))) {
                         Icon(
                             imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -310,75 +323,100 @@ private fun PortraitMusicScreen(
 
             Spacer(modifier = Modifier.height(12.ydp(sy)))
 
-            // 5个控制按钮（放大1.5倍）
+            // 下排：5槽位均分（与上排同一套5槽位逻辑）
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onTogglePlayMode, modifier = Modifier.size(72.sdp(su))) {
-                    Icon(
-                        imageVector = when (playMode) {
-                            PlayMode.LIST_LOOP -> Icons.Filled.Repeat
-                            PlayMode.SINGLE_LOOP -> Icons.Filled.RepeatOne
-                            PlayMode.SHUFFLE -> Icons.Filled.Shuffle
-                        },
-                        contentDescription = "循环模式",
-                        tint = Color.White,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                IconButton(onClick = onPrevious, modifier = Modifier.size(96.sdp(su))) {
-                    Icon(
-                        imageVector = Icons.Filled.SkipPrevious,
-                        contentDescription = "上一首",
-                        tint = Color.White,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
+                // 槽位1：循环（占1份）
                 Box(
-                    modifier = Modifier
-                        .size(96.sdp(su))
-                        .clip(CircleShape)
-                        .background(Color(0xFF7B6DFF)),
+                    modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(48.sdp(su)),
-                            strokeWidth = 3.sdp(su)
+                    IconButton(onClick = onTogglePlayMode, modifier = Modifier.size(72.sdp(su))) {
+                        Icon(
+                            imageVector = when (playMode) {
+                                PlayMode.LIST_LOOP -> Icons.Filled.Repeat
+                                PlayMode.SINGLE_LOOP -> Icons.Filled.RepeatOne
+                                PlayMode.SHUFFLE -> Icons.Filled.Shuffle
+                            },
+                            contentDescription = "循环模式",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxSize()
                         )
-                    } else {
-                        IconButton(onClick = onPlayPause, modifier = Modifier.size(72.sdp(su))) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (isPlaying) "暂停" else "播放",
-                                tint = Color.White,
-                                modifier = Modifier.fillMaxSize()
+                    }
+                }
+                // 槽位2：上一首（占1份）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onPrevious, modifier = Modifier.size(96.sdp(su))) {
+                        Icon(
+                            imageVector = Icons.Filled.SkipPrevious,
+                            contentDescription = "上一首",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                // 槽位3：播放（占1份）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(96.sdp(su))
+                            .clip(CircleShape)
+                            .background(Color(0xFF7B6DFF)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(48.sdp(su)),
+                                strokeWidth = 3.sdp(su)
                             )
+                        } else {
+                            IconButton(onClick = onPlayPause, modifier = Modifier.size(72.sdp(su))) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (isPlaying) "暂停" else "播放",
+                                    tint = Color.White,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }
-
-                IconButton(onClick = onNext, modifier = Modifier.size(96.sdp(su))) {
-                    Icon(
-                        imageVector = Icons.Filled.SkipNext,
-                        contentDescription = "下一首",
-                        tint = Color.White,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                // 槽位4：下一首（占1份）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onNext, modifier = Modifier.size(96.sdp(su))) {
+                        Icon(
+                            imageVector = Icons.Filled.SkipNext,
+                            contentDescription = "下一首",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
-
-                IconButton(onClick = onOpenQueue, modifier = Modifier.size(72.sdp(su))) {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = "播放列表",
-                        tint = Color.White,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                // 槽位5：查看歌单（占1份）
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onOpenQueue, modifier = Modifier.size(72.sdp(su))) {
+                        Icon(
+                            imageVector = Icons.Filled.QueueMusic,
+                            contentDescription = "播放列表",
+                            tint = Color.White,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 
