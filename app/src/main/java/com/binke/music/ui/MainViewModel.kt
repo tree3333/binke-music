@@ -233,28 +233,11 @@ class MainViewModel(
 
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0) {
         viewModelScope.launch {
-            // 始终做封面增强（iTunes → 网易云 → 酷我兜底），确保播放时封面质量最高
-            val rawSongs = playlist.musicList.takeIf { it.isNotEmpty() }
+            // 列表封面直接用酷我原图，不做高清增强，保证列表加载速度
+            val songs = playlist.musicList.takeIf { it.isNotEmpty() }
                 ?: withContext(Dispatchers.IO) {
                     apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
                 }
-            val songs = if (rawSongs.isNotEmpty()) {
-                withContext(Dispatchers.IO) {
-                    rawSongs.map { song ->
-                        async {
-                            if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                                val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                                if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
-                                val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                                if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
-                            }
-                            song
-                        }
-                    }.awaitAll()
-                }
-            } else {
-                rawSongs
-            }
             if (songs.isNotEmpty()) {
                 _playlist.value = songs
                 _currentIndex.value = startIndex.coerceIn(0, songs.lastIndex)
@@ -349,6 +332,29 @@ class MainViewModel(
 
             repository.addToHistory(song)
             refreshHistory()
+
+            // 封面增强：iTunes → 网易云 → 酷我兜底，获取高清封面后更新 UI
+            viewModelScope.launch(Dispatchers.IO) {
+                if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                    val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                    if (itunesPic.isNotBlank()) {
+                        val enhanced = song.copy(pic = itunesPic)
+                        withContext(viewModelScope.coroutineContext) {
+                            _currentSong.value = enhanced
+                        }
+                        return@launch
+                    }
+                    val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                    if (neteasePic.isNotBlank()) {
+                        val enhanced = song.copy(pic = neteasePic)
+                        withContext(viewModelScope.coroutineContext) {
+                            _currentSong.value = enhanced
+                        }
+                        return@launch
+                    }
+                }
+                // 酷我原封面兜底，不更新（保持原样）
+            }
 
             try {
                 // 缓存优先，并发加载播放地址
