@@ -42,8 +42,8 @@ class SongCache(private val apiService: KuwoApiService) {
     suspend fun loadOrGetPlayUrl(song: Song): String? {
         cache[song.id]?.playUrl?.let { return it }
         val url = apiService.getPlayUrl(song.musicRid).url
-        val existing = cache[song.id]
-        cache[song.id] = Entry(playUrl = url, pic = existing?.pic ?: song.pic, lyrics = existing?.lyrics)
+        // 写回时用当前 song.pic（已增强），保持缓存图片URL与UI一致
+        cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics)
         return url
     }
 
@@ -122,12 +122,8 @@ class SongCache(private val apiService: KuwoApiService) {
             if (cache[song.id]?.playUrl == null) {
                 scope.launch {
                     val url = apiService.getPlayUrl(song.musicRid).url
-                    val existing = cache[song.id]
-                    cache[song.id] = Entry(
-                        playUrl = url,
-                        pic = existing?.pic ?: song.pic,
-                        lyrics = existing?.lyrics
-                    )
+                    // 用 song.pic（已增强），确保 Coil 预加载的 URL 与 SongCache 缓存的 pic 一致
+                    cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics)
                 }
             }
         }
