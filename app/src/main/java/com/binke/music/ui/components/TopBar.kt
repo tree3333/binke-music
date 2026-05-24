@@ -82,13 +82,13 @@ fun TopBar(
                     imageVector = Icons.Default.Search,
                     contentDescription = "搜索",
                     tint = Color(0xFF8E8E93),
-                    modifier = Modifier.size(26.sdp(su))
+                    modifier = Modifier.size(39.sdp(su))
                 )
                 Spacer(modifier = Modifier.width(12.xdp(sx)))
                 Text(
                     text = "搜索歌手、歌曲名称",
                     color = Color(0xFF8E8E93),
-                    fontSize = (18 * su).sp
+                    fontSize = (27 * su).sp
                 )
             }
         }
