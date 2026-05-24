@@ -126,8 +126,9 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
-     * 预加载封面图片（后台，触发 Coil 加载到内存缓存）。
-     * 使用 memoryCachePolicy = ENABLED，下次加载直接命中内存。
+     * 预加载封面图片（后台，触发全局 ImageLoader 加载到内存缓存）。
+     * BinkeMusicApp 已全局配置 memoryCachePolicy=ENABLED / diskCachePolicy=DISABLED，
+     * 此处直接用 ImageLoader(context) 即可命中同一缓存池。
      */
     fun preloadPics(context: Context, songs: List<Song>) {
         val imageLoader = ImageLoader(context)
@@ -137,8 +138,6 @@ class SongCache(private val apiService: KuwoApiService) {
             scope.launch {
                 val request = ImageRequest.Builder(context)
                     .data(picUrl)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.DISABLED)  // 不落磁盘
                     .build()
                 imageLoader.execute(request)
             }
