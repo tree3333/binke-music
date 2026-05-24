@@ -228,7 +228,7 @@ private fun PlaylistDrawerContent(
 
         Spacer(modifier = Modifier.height(18.ydp(sy)))
 
-        // 播放全部：高度比字多 20%，按钮拉长与歌单列表同宽
+        // 播放全部：移除固定高度，改用 Button 默认 padding 自然适应内容
         Button(
             onClick = onPlayAll,
             colors = ButtonDefaults.buttonColors(
@@ -236,13 +236,11 @@ private fun PlaylistDrawerContent(
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape((30 * su).dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height((36 * 1.2f * su).dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Filled.PlayArrow, null, Modifier.size((30 * su).dp))
+            Icon(Icons.Filled.PlayArrow, null, Modifier.size((24 * su).dp))
             Spacer(modifier = Modifier.width(12.xdp(sx)))
-            Text("播放全部", fontSize = (30 * su).sp, color = Color.White)
+            Text("播放全部", fontSize = (20 * su).sp, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(14.ydp(sy)))
