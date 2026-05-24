@@ -157,8 +157,8 @@ class SongCache(private val apiService: KuwoApiService) {
             if (picUrl.isNullOrBlank()) return@forEach
             // 检查 Coil 内存缓存是否已有此封面
             val request = ImageRequest.Builder(ctx).data(picUrl).build()
-            val cacheKey = request.memoryCacheKey
-            val cachedBitmap = memoryCache?.get(cacheKey)
+            val cacheKey = request.memoryCacheKey ?: return@forEach
+            val cachedBitmap = memoryCache?.get(cacheKey!!)
             if (cachedBitmap != null) {
                 pendingHits.add("封面命中缓存")
                 return@forEach
