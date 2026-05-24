@@ -70,7 +70,9 @@ import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.player.BinkeMediaCallbacks
 import com.binke.music.player.MediaControllerCallback
+import com.binke.music.player.MusicPlayer
 import com.binke.music.player.PlaybackService
+import com.binke.music.player.SongCache
 import com.binke.music.ui.MainViewModel
 import com.binke.music.ui.MainViewModelFactory
 import com.binke.music.ui.PlaylistDrawer
@@ -141,6 +143,7 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val app = application as BinkeMusicApp
+        SongCache.setAppContext(app)
         val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 

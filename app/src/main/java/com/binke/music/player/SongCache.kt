@@ -1,5 +1,9 @@
 package com.binke.music.player
 
+import android.content.Context
+import coil.ImageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.binke.music.data.api.KuwoApiService
 import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.Song
@@ -10,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
 /**
- * 歌曲预加载缓存：播放地址 + 歌词。
+ * 歌曲预加载缓存：播放地址 + 封面图片 + 歌词。
  * 采用 cache-aside 模式，优先读缓存，未命中再从网络加载。
  * 切歌时只更新缓存头部一个条目，并追加预加载下一首。
  */
@@ -18,8 +22,8 @@ class SongCache(private val apiService: KuwoApiService) {
 
     data class Entry(
         val playUrl: String?,
-        val lyrics: List<LrcLine>?,
-        val loading: Boolean = false
+        val pic: String?,
+        val lyrics: List<LrcLine>?
     )
 
     // 缓存 key 使用 Song.id（rid.toString()）
@@ -34,14 +38,13 @@ class SongCache(private val apiService: KuwoApiService) {
     fun hasPlayUrl(song: Song): Boolean =
         cache[song.id]?.playUrl != null
 
-    /** 从缓存或网络加载完整 Entry */
-    suspend fun loadOrGet(song: Song): Entry {
-        cache[song.id]?.let { return it }
-
+    /** 从缓存或网络加载播放地址（同步） */
+    suspend fun loadOrGetPlayUrl(song: Song): String? {
+        cache[song.id]?.playUrl?.let { return it }
         val url = apiService.getPlayUrl(song.musicRid).url
-        val entry = Entry(playUrl = url, lyrics = null, loading = false)
-        cache[song.id] = entry
-        return entry
+        val existing = cache[song.id]
+        cache[song.id] = Entry(playUrl = url, pic = existing?.pic ?: song.pic, lyrics = existing?.lyrics)
+        return url
     }
 
     /** 加载歌词并写缓存 */
@@ -88,6 +91,7 @@ class SongCache(private val apiService: KuwoApiService) {
         val existing = cache[song.id]
         cache[song.id] = Entry(
             playUrl = existing?.playUrl,
+            pic = existing?.pic ?: song.pic,
             lyrics = lyrics
         )
         return lyrics
@@ -95,7 +99,6 @@ class SongCache(private val apiService: KuwoApiService) {
 
     /**
      * 预加载多首歌曲的播放地址（后台，不阻塞）。
-     * @param songs 要预加载的歌曲列表
      */
     fun preloadPlayUrls(songs: List<Song>) {
         songs.forEach { song ->
@@ -105,6 +108,7 @@ class SongCache(private val apiService: KuwoApiService) {
                     val existing = cache[song.id]
                     cache[song.id] = Entry(
                         playUrl = url,
+                        pic = existing?.pic ?: song.pic,
                         lyrics = existing?.lyrics
                     )
                 }
@@ -121,14 +125,42 @@ class SongCache(private val apiService: KuwoApiService) {
         }
     }
 
+    /**
+     * 预加载封面图片（后台，触发 Coil 加载到磁盘缓存）。
+     * 内部使用 Coil 默认 ImageLoader（已配置 OkHttp 缓存）。
+     */
+    fun preloadPics(context: Context, songs: List<Song>) {
+        val imageLoader = ImageLoader(context)
+        songs.forEach { song ->
+            val picUrl = song.pic
+            if (picUrl.isNullOrBlank()) return@forEach
+            scope.launch {
+                val request = ImageRequest.Builder(context)
+                    .data(picUrl)
+                    .memoryCachePolicy(CachePolicy.DISABLED)  // 只写磁盘缓存，不占内存
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .build()
+                imageLoader.execute(request)
+            }
+        }
+    }
+
     companion object {
         @Volatile
         private var instance: SongCache? = null
+
+        private var appContext: Context? = null
 
         fun getInstance(apiService: KuwoApiService): SongCache {
             return instance ?: synchronized(this) {
                 instance ?: SongCache(apiService).also { instance = it }
             }
         }
+
+        fun setAppContext(context: Context) {
+            appContext = context.applicationContext
+        }
+
+        fun getAppContext(): Context? = appContext
     }
 }
