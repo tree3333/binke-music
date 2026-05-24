@@ -371,6 +371,9 @@ class MainViewModel(
         // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
         lyricsJob?.cancel()
 
+        // 立即预加载当前歌曲封面（添加到 preloadedCoverUrls，确保下次命中检测生效）
+        songCache.preloadPics(listOf(song))
+
         viewModelScope.launch {
             _isLoading.value = true
             _playbackError.value = null

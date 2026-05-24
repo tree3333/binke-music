@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.player.SongCache
@@ -320,6 +321,7 @@ private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, 
 /**
  * 统一封面组件：优先从 SongCache 内存 Bitmap 直接渲染（命中则无网络延迟），
  * 未命中则走 AsyncImage（触发预加载）。与播放地址/歌词共用同一滑动窗口缓存体系。
+ * 检测两层缓存：1) preloadedCoverUrls 集合  2) Coil memoryCache
  */
 @Composable
 private fun CachedCoverImage(
@@ -328,15 +330,35 @@ private fun CachedCoverImage(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val songCache = remember { SongCache.getInstance() }
-    val cachedBitmap = song.id.let { songCache?.getCoverBitmap(it) }
+    val ctx = songCache?.let { SongCache.getAppContext() }
 
-    if (cachedBitmap != null) {
-        Image(
-            bitmap = cachedBitmap.asImageBitmap(),
-            contentDescription = null,
-            modifier = modifier,
-            contentScale = contentScale
-        )
+    // 命中判断：URL 已在 preloadedCoverUrls，或 Coil memoryCache 已有 bitmap
+    val isCached = song.pic.isNotBlank() && (
+        songCache?.hasCover(song) == true ||
+        (ctx != null && SongCache.getImageLoader()?.memoryCache?.let { mc ->
+            val req = ImageRequest.Builder(ctx).data(song.pic).build()
+            req.memoryCacheKey?.let { mc.get(it) != null } ?: false
+        } == true)
+    )
+
+    if (isCached) {
+        val cachedBitmap = song.id.let { songCache?.getCoverBitmap(it) }
+        if (cachedBitmap != null) {
+            Image(
+                bitmap = cachedBitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = modifier,
+                contentScale = contentScale
+            )
+        } else {
+            // Bitmap 还没解码完，但 URL 已标记，走 AsyncImage 从 Coil 缓存渲染
+            AsyncImage(
+                model = song.pic,
+                contentDescription = null,
+                modifier = modifier,
+                contentScale = contentScale
+            )
+        }
     } else {
         AsyncImage(
             model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
