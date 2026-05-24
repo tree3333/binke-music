@@ -707,7 +707,9 @@ class MainViewModel(
                 loadSearchHistory()
             }
             val results = withContext(Dispatchers.IO) {
-                apiService.searchSongs(query)
+                val raw = apiService.searchSongs(query)
+                android.util.Log.d("SearchDebug", "searchSongs($query) returned ${raw.size} results")
+                raw
             }
             // 封面增强：iTunes → 网易云 → 酷我兜底
             val enhanced = withContext(Dispatchers.IO) {

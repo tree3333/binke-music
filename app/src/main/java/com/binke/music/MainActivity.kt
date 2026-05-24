@@ -209,7 +209,6 @@ fun MainScreen(viewModel: MainViewModel) {
     val playMode by viewModel.playMode.collectAsState()
     val lyrics by viewModel.lyrics.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val cacheToast by viewModel.cacheToast.collectAsState()
 
     val recommendPlaylists by viewModel.recommendPlaylists.collectAsState()
     val bangPlaylists by viewModel.bangPlaylists.collectAsState()
@@ -238,14 +237,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     val playbackError by viewModel.playbackError.collectAsState()
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
-
-    // 缓存调试 toast（只展示命中项），显示后立即清空以便下次触发
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(cacheToast) {
-        val msg = cacheToast ?: return@LaunchedEffect
-        Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
-        viewModel.clearCacheToast()
-    }
 
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
