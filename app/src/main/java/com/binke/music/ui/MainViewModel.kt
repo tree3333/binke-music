@@ -325,46 +325,41 @@ class MainViewModel(
             _isLoading.value = true
             _playbackError.value = null
             _playbackDebugParams.value = null
-            _currentSong.value = song
             _currentPosition.value = 0L
             _duration.value = 0L
             _lyrics.value = emptyList()
 
-            repository.addToHistory(song)
-            refreshHistory()
-
-            // 封面增强：iTunes → 网易云 → 酷我兜底，获取高清封面后更新 UI
-            viewModelScope.launch(Dispatchers.IO) {
+            // 封面增强优先：先拿到高清封面再播放，确保播放器从一开始就显示高清图
+            val enhancedSong = withContext(Dispatchers.IO) {
                 if (song.artist.isNotBlank() && song.name.isNotBlank()) {
                     val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                    if (itunesPic.isNotBlank()) {
-                        val enhanced = song.copy(pic = itunesPic)
-                        withContext(viewModelScope.coroutineContext) {
-                            _currentSong.value = enhanced
-                        }
-                        return@launch
-                    }
+                    if (itunesPic.isNotBlank()) return@withContext song.copy(pic = itunesPic)
                     val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                    if (neteasePic.isNotBlank()) {
-                        val enhanced = song.copy(pic = neteasePic)
-                        withContext(viewModelScope.coroutineContext) {
-                            _currentSong.value = enhanced
-                        }
-                        return@launch
-                    }
+                    if (neteasePic.isNotBlank()) return@withContext song.copy(pic = neteasePic)
                 }
-                // 酷我原封面兜底，不更新（保持原样）
+                song
             }
+            _currentSong.value = enhancedSong
+            // 同时更新 playlist 里对应歌曲的封面（收藏/本地歌单场景）
+            val idx = _playlist.value.indexOfFirst { it.id == song.id }
+            if (idx >= 0) {
+                val updatedList = _playlist.value.toMutableList()
+                updatedList[idx] = enhancedSong
+                _playlist.value = updatedList
+            }
+
+            repository.addToHistory(enhancedSong)
+            refreshHistory()
 
             try {
                 // 缓存优先，并发加载播放地址
                 val playUrlDeferred = viewModelScope.async(Dispatchers.IO) {
-                    val cached = songCache.get(song)
+                    val cached = songCache.get(enhancedSong)
                     if (cached?.playUrl != null) {
                         cached.playUrl
                     } else {
-                        val url = apiService.getPlayUrl(song.musicRid).url
-                        songCache.preloadPlayUrls(listOf(song))
+                        val url = apiService.getPlayUrl(enhancedSong.musicRid).url
+                        songCache.preloadPlayUrls(listOf(enhancedSong))
                         url
                     }
                 }
@@ -372,24 +367,23 @@ class MainViewModel(
                 val playUrl = result
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
-                    song.playUrl = playUrl
                     musicPlayer.play(playUrl)
                     _isPlaying.value = true
                     // 开始播放后预加载接下来的 3 首
                     preloadUpcoming()
                 } else {
                     _playbackDebugParams.value = buildPlaybackParams(null)
-                    _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${apiService.getPlayUrl(song.musicRid).debugInfo}"
+                    _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${apiService.getPlayUrl(enhancedSong.musicRid).debugInfo}"
                 }
 
                 // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
                 // 歌词也从缓存读（缓存会后台更新）
                 lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                    val cachedLyrics = songCache.get(song)?.lyrics
+                    val cachedLyrics = songCache.get(enhancedSong)?.lyrics
                     if (cachedLyrics != null) {
                         if (isActive) _lyrics.value = cachedLyrics
                     } else {
-                        val lyrics = songCache.loadLyrics(song)
+                        val lyrics = songCache.loadLyrics(enhancedSong)
                         if (isActive) _lyrics.value = lyrics
                     }
                 }
