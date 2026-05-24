@@ -6,6 +6,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -228,6 +229,17 @@ fun MainScreen(viewModel: MainViewModel) {
     val drawerPlaylist by viewModel.drawerPlaylist.collectAsState()
     val drawerSongs by viewModel.drawerSongs.collectAsState()
 
+    val cfg = LocalConfiguration.current
+    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
+    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
+    val su = (sx + sy) / 2f
+    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
+
+    // 竖屏搜索结果时拦截返回键，清空搜索而非退出程序
+    BackHandler(enabled = isPortrait && searchQuery.isNotEmpty()) {
+        viewModel.updateSearchQuery("")
+    }
+
     val showQueueSheet by viewModel.showQueueSheet.collectAsState()
     val queue by viewModel.playlist.collectAsState()
     val currentIndex by viewModel.currentIndex.collectAsState()
@@ -237,12 +249,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     val playbackError by viewModel.playbackError.collectAsState()
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
-
-    val cfg = LocalConfiguration.current
-    val sx = cfg.screenWidthDp / BASE_WIDTH_DP
-    val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
-    val su = (sx + sy) / 2f
-    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
 
     val isFavorite = currentSong?.let { viewModel.isFavorite(it.id) } ?: false
 
