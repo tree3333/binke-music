@@ -261,19 +261,33 @@ class MainViewModel(
             val songs = if (drawerSongs.isNotEmpty()) {
                 drawerSongs
             } else {
-                val sourceSongs = playlist.musicList.takeIf { it.isNotEmpty() }
-                if (sourceSongs != null) {
-                    sourceSongs
-                } else {
-                    withContext(Dispatchers.IO) {
+                // 未开过抽屉，同步做封面增强（iTunes → 网易云 → 酷我兜底），确保预加载和UI用同一个URL
+                val rawSongs = playlist.musicList.takeIf { it.isNotEmpty() }
+                    ?: withContext(Dispatchers.IO) {
                         apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
                     }
+                if (rawSongs.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        rawSongs.map { song ->
+                            async {
+                                if (song.artist.isNotBlank() && song.name.isNotBlank()) {
+                                    val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
+                                    if (itunesPic.isNotBlank()) return@async song.copy(pic = itunesPic)
+                                    val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
+                                    if (neteasePic.isNotBlank()) return@async song.copy(pic = neteasePic)
+                                }
+                                song
+                            }
+                        }.awaitAll()
+                    }
+                } else {
+                    rawSongs
                 }
             }
             if (songs.isNotEmpty()) {
                 _playlist.value = songs
                 _currentIndex.value = startIndex.coerceIn(0, songs.lastIndex)
-                _playlistSource.value = PlaylistSource.NONE   // 首页歌单不关联"我的"标签
+                _playlistSource.value = PlaylistSource.NONE
                 closePlaylistDrawer()
                 setTab(1)
                 playSongAt(_currentIndex.value)
