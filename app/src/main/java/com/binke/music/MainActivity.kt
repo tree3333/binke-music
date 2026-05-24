@@ -264,7 +264,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(0.9f)
                         .padding(horizontal = 12.xdp(sx), vertical = 10.ydp(sy)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -281,7 +281,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "搜索",
                                 tint = Color(0xFF8E8E93),
-                                modifier = Modifier.size(22.sdp(su))
+                                modifier = Modifier.size(44.sdp(su))
                             )
                             Spacer(modifier = Modifier.width(10.xdp(sx)))
                             BasicTextField(
@@ -290,12 +290,12 @@ fun MainScreen(viewModel: MainViewModel) {
                                     searchInput = it
                                     viewModel.updateSearchQuery(it)
                                 },
-                                textStyle = TextStyle(color = Color.White, fontSize = (36 * su).sp, fontWeight = FontWeight.SemiBold),
+                                textStyle = TextStyle(color = Color.White, fontSize = (29 * su).sp),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 decorationBox = { innerTextField ->
                                     if (searchInput.isEmpty()) {
-                                        Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (36 * su).sp, fontWeight = FontWeight.SemiBold)
+                                        Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (29 * su).sp)
                                     }
                                     innerTextField()
                                 }
@@ -307,7 +307,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                         searchInput = ""
                                         viewModel.updateSearchQuery("")
                                     },
-                                    modifier = Modifier.size(28.sdp(su))
+                                    modifier = Modifier.size(24.sdp(su))
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Close,
