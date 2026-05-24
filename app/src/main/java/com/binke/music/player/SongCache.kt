@@ -126,8 +126,8 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
-     * 预加载封面图片（后台，触发 Coil 加载到磁盘缓存）。
-     * 内部使用 Coil 默认 ImageLoader（已配置 OkHttp 缓存）。
+     * 预加载封面图片（后台，触发 Coil 加载到内存缓存）。
+     * 使用 memoryCachePolicy = ENABLED，下次加载直接命中内存。
      */
     fun preloadPics(context: Context, songs: List<Song>) {
         val imageLoader = ImageLoader(context)
@@ -137,8 +137,8 @@ class SongCache(private val apiService: KuwoApiService) {
             scope.launch {
                 val request = ImageRequest.Builder(context)
                     .data(picUrl)
-                    .memoryCachePolicy(CachePolicy.DISABLED)  // 只写磁盘缓存，不占内存
-                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.DISABLED)  // 不落磁盘
                     .build()
                 imageLoader.execute(request)
             }
