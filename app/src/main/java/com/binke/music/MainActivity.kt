@@ -256,8 +256,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // 竖屏时搜索栏放最上面（可点击输入，不再跳转新页面）
-            if (isPortrait) {
+            // 竖屏时搜索栏放最上面（仅推荐页展示）
+            if (isPortrait && currentTab == 0) {
                 var searchInput by remember { mutableStateOf("") }
                 LaunchedEffect(searchQuery) {
                     if (searchQuery.isEmpty() && searchInput.isNotEmpty()) {
