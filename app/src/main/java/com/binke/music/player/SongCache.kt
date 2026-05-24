@@ -98,7 +98,24 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
+     * 滑动窗口清理：只保留 [currentIdx, currentIdx + windowSize] 范围内的歌曲缓存。
+     * 在预加载前调用，确保缓存队列深度始终为 windowSize。
+     */
+    fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = 3) {
+        if (playlist.isEmpty()) return
+        val windowIds = (currentIdx until minOf(currentIdx + windowSize, playlist.size))
+            .mapNotNull { idx -> playlist.getOrNull(idx)?.id }
+            .toSet()
+        cache.keys.toList().forEach { id ->
+            if (id !in windowIds) {
+                cache.remove(id)
+            }
+        }
+    }
+
+    /**
      * 预加载多首歌曲的播放地址（后台，不阻塞）。
+     * 已在 preloadUpcoming 中按滑动窗口过滤，只预加载窗口内的歌曲。
      */
     fun preloadPlayUrls(songs: List<Song>) {
         songs.forEach { song ->

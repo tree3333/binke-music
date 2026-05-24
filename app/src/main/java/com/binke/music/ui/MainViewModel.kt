@@ -428,6 +428,9 @@ class MainViewModel(
         val currentIdx = _currentIndex.value
         if (playlist.isEmpty()) return
 
+        // 滑动窗口清理：只保留 [currentIdx, currentIdx + 3]，移除已播放的条目
+        songCache.evictOutsideWindow(playlist, currentIdx)
+
         val upcoming = mutableListOf<Song>()
         val size = playlist.size
 
