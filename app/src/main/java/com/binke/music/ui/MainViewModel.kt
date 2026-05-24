@@ -70,11 +70,6 @@ class MainViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    /** 缓存命中调试 toast */
-    private val _cacheToast = MutableStateFlow<String?>(null)
-    val cacheToast: StateFlow<String?> = _cacheToast.asStateFlow()
-    fun clearCacheToast() { _cacheToast.value = null }
-
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
@@ -390,7 +385,6 @@ class MainViewModel(
                 val playUrlDeferred = viewModelScope.async(Dispatchers.IO) {
                     val cached = songCache.get(song)
                     if (cached?.playUrl != null) {
-                        songCache.pendingHits.add("播放地址命中缓存")
                         cached.playUrl
                     } else {
                         val url = apiService.getPlayUrl(song.musicRid).url
@@ -407,12 +401,6 @@ class MainViewModel(
                     _isPlaying.value = true
                     // 开始播放后预加载接下来的 3 首
                     preloadUpcoming()
-                    // 打包所有命中项为一条 toast（只展示命中，未命中不写）
-                    val hits = songCache.pendingHits.toList()
-                    songCache.clearPendingHits()
-                    if (hits.isNotEmpty()) {
-                        _cacheToast.value = "✅ " + hits.joinToString(" | ")
-                    }
                 } else {
                     _playbackDebugParams.value = buildPlaybackParams(null)
                     _playbackError.value = "未获取到播放地址\n\n--- getPlayUrl 调试信息 ---\n${apiService.getPlayUrl(song.musicRid).debugInfo}"
@@ -423,7 +411,6 @@ class MainViewModel(
                 lyricsJob = viewModelScope.launch(Dispatchers.IO) {
                     val cachedLyrics = songCache.get(song)?.lyrics
                     if (cachedLyrics != null) {
-                        songCache.pendingHits.add("歌词命中缓存")
                         if (isActive) _lyrics.value = cachedLyrics
                     } else {
                         val lyrics = songCache.loadLyrics(song)

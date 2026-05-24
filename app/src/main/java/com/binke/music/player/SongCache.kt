@@ -38,8 +38,8 @@ class SongCache(private val apiService: KuwoApiService) {
     // 记录已预加载封面的 URL 集合（用于统一判断命中）
     private val preloadedCoverUrls = mutableSetOf<String>()
 
-    // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空
-    val pendingHits = mutableListOf<String>()
+    // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空（已禁用）
+    private val pendingHits = mutableListOf<String>()
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
