@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.content.Intent
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -208,6 +209,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val playMode by viewModel.playMode.collectAsState()
     val lyrics by viewModel.lyrics.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val cacheToast by viewModel.cacheToast.collectAsState()
 
     val recommendPlaylists by viewModel.recommendPlaylists.collectAsState()
     val bangPlaylists by viewModel.bangPlaylists.collectAsState()
@@ -236,6 +238,14 @@ fun MainScreen(viewModel: MainViewModel) {
 
     val playbackError by viewModel.playbackError.collectAsState()
     val playbackDebugParams by viewModel.playbackDebugParams.collectAsState()
+
+    // 缓存调试 toast
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(cacheToast) {
+        cacheToast?.let {
+            Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP

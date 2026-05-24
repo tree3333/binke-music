@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +38,7 @@ private data class NavItem(val label: String, val icon: ImageVector)
 private val navItems = listOf(
     NavItem("推荐", Icons.Default.Home),
     NavItem("音乐", Icons.Default.MusicNote),
-    NavItem("我的", Icons.Default.Favorite)
+    NavItem("我的", Icons.Default.Person)
 )
 
 @Composable

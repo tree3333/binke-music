@@ -70,6 +70,10 @@ class MainViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    /** 缓存命中/未命中调试 toast */
+    private val _cacheToast = MutableStateFlow<String?>(null)
+    val cacheToast: StateFlow<String?> = _cacheToast.asStateFlow()
+
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
@@ -383,8 +387,10 @@ class MainViewModel(
                 val playUrlDeferred = viewModelScope.async(Dispatchers.IO) {
                     val cached = songCache.get(song)
                     if (cached?.playUrl != null) {
+                        _cacheToast.value = "✅ 播放地址命中缓存"
                         cached.playUrl
                     } else {
+                        _cacheToast.value = "❌ 播放地址未命中，从网络加载"
                         val url = apiService.getPlayUrl(song.musicRid).url
                         // 回填缓存（后台异步）
                         songCache.preloadPlayUrls(listOf(song))
@@ -408,8 +414,15 @@ class MainViewModel(
                 // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
                 // 歌词也从缓存读（缓存会后台更新）
                 lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                    val lyrics = songCache.loadLyrics(song)
-                    if (isActive) _lyrics.value = lyrics
+                    val cachedLyrics = songCache.get(song)?.lyrics
+                    if (cachedLyrics != null) {
+                        _cacheToast.value = "✅ 歌词命中缓存"
+                        if (isActive) _lyrics.value = cachedLyrics
+                    } else {
+                        _cacheToast.value = "❌ 歌词未命中，从网络加载"
+                        val lyrics = songCache.loadLyrics(song)
+                        if (isActive) _lyrics.value = lyrics
+                    }
                 }
             } catch (e: Exception) {
                 _playbackError.value = e.message ?: "播放失败"
