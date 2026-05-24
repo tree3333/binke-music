@@ -243,11 +243,10 @@ class MainViewModel(
                 _drawerPlaylist.value = detail.copy(musicList = enhancedSongs)
                 _drawerSongs.value = enhancedSongs
                 // 如果 _playlist 正在播放本歌单，同步增强后的封面（iTunes → 网易云 → 酷我）到 _playlist
-                if (_playlist.isNotEmpty()) {
-                    val playlistIds = _playlist.map { it.id }.toSet()
+                if (_playlist.value.isNotEmpty()) {
                     val enhancedMap = enhancedSongs.associateBy { it.id }
                     val synced = _playlist.value.map { song -> enhancedMap[song.id] ?: song }
-                    if (synced.any { it.pic != _playlist.value.find { p -> p.id == it.id }?.pic }) {
+                    if (synced.any { s -> s.pic != _playlist.value.find { p -> p.id == s.id }?.pic }) {
                         _playlist.value = synced
                     }
                 }
