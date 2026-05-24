@@ -260,7 +260,9 @@ fun MainScreen(viewModel: MainViewModel) {
             if (isPortrait) {
                 var searchInput by remember { mutableStateOf("") }
                 LaunchedEffect(searchQuery) {
-                    if (searchQuery.isEmpty()) searchInput = ""
+                    if (searchQuery.isEmpty() && searchInput.isNotEmpty()) {
+                        searchInput = ""
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -274,9 +276,9 @@ fun MainScreen(viewModel: MainViewModel) {
                             .height(56.sdp(su))
                             .background(Color(0xFF26262B), RoundedCornerShape(16.sdp(su)))
                             .padding(horizontal = 16.xdp(sx)),
-                        contentAlignment = Alignment.CenterStart
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "搜索",
@@ -284,22 +286,27 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.size(44.sdp(su))
                             )
                             Spacer(modifier = Modifier.width(10.xdp(sx)))
-                            BasicTextField(
-                                value = searchInput,
-                                onValueChange = {
-                                    searchInput = it
-                                    viewModel.updateSearchQuery(it)
-                                },
-                                textStyle = TextStyle(color = Color.White, fontSize = (29 * su).sp),
+                            Box(
                                 modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                decorationBox = { innerTextField ->
-                                    if (searchInput.isEmpty()) {
-                                        Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (29 * su).sp)
+                                contentAlignment = Alignment.Center
+                            ) {
+                                BasicTextField(
+                                    value = searchInput,
+                                    onValueChange = {
+                                        searchInput = it
+                                        viewModel.updateSearchQuery(it)
+                                    },
+                                    textStyle = TextStyle(color = Color.White, fontSize = (29 * su).sp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    decorationBox = { innerTextField ->
+                                        if (searchInput.isEmpty()) {
+                                            Text("搜索歌手、歌曲、专辑", color = Color(0xFF8E8E93), fontSize = (29 * su).sp)
+                                        }
+                                        innerTextField()
                                     }
-                                    innerTextField()
-                                }
-                            )
+                                )
+                            }
                             if (searchInput.isNotEmpty()) {
                                 Spacer(modifier = Modifier.width(6.xdp(sx)))
                                 IconButton(
