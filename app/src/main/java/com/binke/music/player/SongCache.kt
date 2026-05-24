@@ -1,6 +1,7 @@
 package com.binke.music.player
 
 import android.content.Context
+import android.graphics.Bitmap
 import coil.ImageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * 歌曲预加载缓存：播放地址 + 封面图片 + 歌词。
@@ -23,11 +25,18 @@ class SongCache(private val apiService: KuwoApiService) {
     data class Entry(
         val playUrl: String?,
         val pic: String?,
-        val lyrics: List<LrcLine>?
+        val lyrics: List<LrcLine>?,
+        val coverBitmap: Bitmap? = null
     )
 
     // 缓存 key 使用 Song.id（rid.toString()）
     private val cache = mutableMapOf<String, Entry>()
+
+    // 封面 Bitmap 独立缓存（与 cache.Entry.coverBitmap 同步），直接存 Bitmap 供 Compose Image() 使用
+    private val cachedBitmaps = mutableMapOf<String, Bitmap>()
+
+    // 记录已预加载封面的 URL 集合（用于统一判断命中）
+    private val preloadedCoverUrls = mutableSetOf<String>()
 
     // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空
     val pendingHits = mutableListOf<String>()
@@ -42,6 +51,16 @@ class SongCache(private val apiService: KuwoApiService) {
     /** 缓存是否存在且可用（playUrl 非空） */
     fun hasPlayUrl(song: Song): Boolean =
         cache[song.id]?.playUrl != null
+
+    /** 封面是否已预加载进内存（统一判断：URL 在 preloadedCoverUrls 中） */
+    fun hasCover(song: Song): Boolean =
+        song.pic?.isNotBlank() == true && song.pic in preloadedCoverUrls
+
+    /** 获取已预加载的封面 Bitmap（供 Compose Image() 直接使用） */
+    fun getCoverBitmap(songId: String): Bitmap? = cachedBitmaps[songId]
+
+    /** 获取封面 Bitmap（按 song.id） */
+    fun getCoverBitmap(song: Song): Bitmap? = cachedBitmaps[song.id]
 
     /** 从缓存或网络加载播放地址（同步） */
     suspend fun loadOrGetPlayUrl(song: Song): String? {
@@ -105,17 +124,26 @@ class SongCache(private val apiService: KuwoApiService) {
     /**
      * 滑动窗口清理：只保留 [currentIdx, currentIdx + windowSize] 范围内的歌曲缓存。
      * 在预加载前调用，确保缓存队列深度始终为 windowSize。
+     * 同步清理 cache + cachedBitmaps + preloadedCoverUrls 三层缓存。
      */
     fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = 3) {
         if (playlist.isEmpty()) return
         val windowIds = (currentIdx until minOf(currentIdx + windowSize, playlist.size))
             .mapNotNull { idx -> playlist.getOrNull(idx)?.id }
             .toSet()
+        // 清理 cache
         cache.keys.toList().forEach { id ->
+            if (id !in windowIds) cache.remove(id)
+        }
+        // 清理 Bitmap 缓存
+        cachedBitmaps.keys.toList().forEach { id ->
             if (id !in windowIds) {
-                cache.remove(id)
+                cachedBitmaps.remove(id)
             }
         }
+        // 清理预加载记录（按 pic URL 清理，只删窗口内不存在的）
+        val windowPics = windowIds.mapNotNull { id -> cache[id]?.pic }.toSet()
+        preloadedCoverUrls.removeAll { pic -> pic !in windowPics }
     }
 
     /**
@@ -144,27 +172,43 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
-     * 预加载封面图片（后台，等待图片真正缓存到内存后再返回）。
-     * 使用 SongCache.getImageLoader() 获取与 AsyncImage 同一个实例，保证缓存命中。
-     * 加载前检查 Coil 内存缓存是否已有，命中则记入 pendingHits。
+     * 预加载封面图片（后台，等待图片真正下载并解码成 Bitmap 后再返回）。
+     * 1. 检查 preloadedCoverUrls 是否已有该 URL → 命中 "封面命中缓存"
+     * 2. 用 withContext(Dispatchers.IO) 真正等待 execute() 完成
+     * 3. 用 BitmapFactory 解码 bytes 得到 Bitmap，存入 cachedBitmaps
+     * 4. URL 加入 preloadedCoverUrls，与 playUrl/lyrics 共用同一滑动窗口
      */
     fun preloadPics(songs: List<Song>) {
-        val loader = getImageLoader() ?: return
         val ctx = getAppContext() ?: return
-        val memoryCache = loader.memoryCache
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
-            // 检查 Coil 内存缓存是否已有此封面
-            val request = ImageRequest.Builder(ctx).data(picUrl).build()
-            val cacheKey = request.memoryCacheKey ?: return@forEach
-            val cachedBitmap = memoryCache?.get(cacheKey!!)
-            if (cachedBitmap != null) {
+            // 命中判断：URL 已在预加载集合中
+            if (picUrl in preloadedCoverUrls) {
                 pendingHits.add("封面命中缓存")
                 return@forEach
             }
+            // 未命中：启动协程真正下载并解码
             scope.launch {
-                loader.execute(request)
+                withContext(Dispatchers.IO) {
+                    try {
+                        val loader = getImageLoader()
+                        if (loader == null || ctx == null) return@withContext
+                        val request = ImageRequest.Builder(ctx)
+                            .data(picUrl)
+                            .build()
+                        val result = loader.execute(request)
+                        val bitmap = (result?.drawable as? android.graphics.drawable.BitmapDrawable)
+                            ?.bitmap
+                            ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                        if (bitmap != null) {
+                            cachedBitmaps[song.id] = bitmap
+                            preloadedCoverUrls.add(picUrl)
+                        }
+                    } catch (_: Exception) {
+                        // 下载失败，静默忽略，不影响播放
+                    }
+                }
             }
         }
     }
@@ -183,6 +227,9 @@ class SongCache(private val apiService: KuwoApiService) {
                 instance ?: SongCache(apiService).also { instance = it }
             }
         }
+
+        /** 无参获取单例（供 Compose UI 层调用，无需传入 apiService） */
+        fun getInstance(): SongCache? = instance
 
         fun setAppContext(context: Context) {
             appContext = context.applicationContext

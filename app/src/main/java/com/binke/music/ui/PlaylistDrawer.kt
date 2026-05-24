@@ -1,5 +1,6 @@
 package com.binke.music.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -49,6 +51,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
+import com.binke.music.player.SongCache
 import kotlin.math.roundToInt
 
 private const val BASE_WIDTH_DP = 1920f
@@ -116,7 +119,6 @@ fun PlaylistDrawer(
                     PlaylistDrawerContent(
                         playlist = playlist,
                         songs = songs,
-                        onDismiss = onDismiss,
                         onPlayAll = onPlayAll,
                         onSongClick = onSongClick,
                         sx = sx, sy = sy, su = su
@@ -157,7 +159,6 @@ fun PlaylistDrawer(
                     PlaylistDrawerContent(
                         playlist = playlist,
                         songs = songs,
-                        onDismiss = onDismiss,
                         onPlayAll = onPlayAll,
                         onSongClick = onSongClick,
                         sx = sx, sy = sy, su = su
@@ -172,11 +173,15 @@ fun PlaylistDrawer(
 private fun PlaylistDrawerContent(
     playlist: Playlist,
     songs: List<Song>,
-    onDismiss: () -> Unit,
     onPlayAll: () -> Unit,
     onSongClick: (Int) -> Unit,
     sx: Float, sy: Float, su: Float
 ) {
+    // Banner 放大 1.5 倍（160 → 240）
+    val bannerSize = (160 * 1.5f).toInt().sdp(su)
+    // 标题缩小 0.7 倍
+    val titleFontSize = (52 * 0.7f * su).sp
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -186,7 +191,7 @@ private fun PlaylistDrawerContent(
                 model = playlist.img.ifEmpty { "https://via.placeholder.com/240/171717/F1F1F1?text=BinKe" },
                 contentDescription = null,
                 modifier = Modifier
-                    .size((160 * 1.5f).toInt().sdp(su))
+                    .size(bannerSize)
                     .clip(RoundedCornerShape(16.sdp(su))),
                 contentScale = ContentScale.Crop
             )
@@ -197,7 +202,7 @@ private fun PlaylistDrawerContent(
                 Text(
                     text = playlist.name,
                     color = Color.White,
-                    fontSize = (52 * su * 0.7f).sp,
+                    fontSize = titleFontSize,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -223,18 +228,19 @@ private fun PlaylistDrawerContent(
 
         Spacer(modifier = Modifier.height(18.ydp(sy)))
 
+        // 播放全部：高度比字多 20%，按钮拉长与歌单列表同宽
         Button(
             onClick = onPlayAll,
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFF6B5BFF),
                 contentColor = Color.White
             ),
-            shape = RoundedCornerShape(36.sdp(su)),
+            shape = RoundedCornerShape((30 * su).dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.xdp(sx))
+                .height((36 * 1.2f * su).dp)
         ) {
-            Icon(Icons.Filled.PlayArrow, null, Modifier.size(36.sdp(su)))
+            Icon(Icons.Filled.PlayArrow, null, Modifier.size((30 * su).dp))
             Spacer(modifier = Modifier.width(12.xdp(sx)))
             Text("播放全部", fontSize = (30 * su).sp, color = Color.White)
         }
@@ -267,9 +273,8 @@ private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, 
             .padding(14.sdp(su)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
-            contentDescription = null,
+        CachedCoverImage(
+            song = song,
             modifier = Modifier
                 .size(coverSize)
                 .clip(RoundedCornerShape(10.sdp(su))),
@@ -308,6 +313,36 @@ private fun SongListItem(song: Song, onClick: () -> Unit, sx: Float, sy: Float, 
             text = song.durationText,
             color = Color(0xFFBDBDBD),
             fontSize = (28 * su).sp
+        )
+    }
+}
+
+/**
+ * 统一封面组件：优先从 SongCache 内存 Bitmap 直接渲染（命中则无网络延迟），
+ * 未命中则走 AsyncImage（触发预加载）。与播放地址/歌词共用同一滑动窗口缓存体系。
+ */
+@Composable
+private fun CachedCoverImage(
+    song: Song,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    val songCache = remember { SongCache.getInstance() }
+    val cachedBitmap = song.id.let { songCache?.getCoverBitmap(it) }
+
+    if (cachedBitmap != null) {
+        Image(
+            bitmap = cachedBitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    } else {
+        AsyncImage(
+            model = song.pic.ifEmpty { "https://via.placeholder.com/100/171717/F1F1F1?text=BinKe" },
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = contentScale
         )
     }
 }
