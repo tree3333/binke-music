@@ -242,18 +242,33 @@ class MainViewModel(
                 }
                 _drawerPlaylist.value = detail.copy(musicList = enhancedSongs)
                 _drawerSongs.value = enhancedSongs
+                // 如果 _playlist 正在播放本歌单，同步增强后的封面（iTunes → 网易云 → 酷我）到 _playlist
+                if (_playlist.isNotEmpty()) {
+                    val playlistIds = _playlist.map { it.id }.toSet()
+                    val enhancedMap = enhancedSongs.associateBy { it.id }
+                    val synced = _playlist.value.map { song -> enhancedMap[song.id] ?: song }
+                    if (synced.any { it.pic != _playlist.value.find { p -> p.id == it.id }?.pic }) {
+                        _playlist.value = synced
+                    }
+                }
             }
         }
     }
 
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0) {
         viewModelScope.launch {
-            val sourceSongs = playlist.musicList.takeIf { it.isNotEmpty() }
-            val songs = if (sourceSongs != null) {
-                sourceSongs
+            // 优先用已增强好的 _drawerSongs，保持封面顺序：iTunes → 网易云 → 酷我
+            val drawerSongs = _drawerSongs.value
+            val songs = if (drawerSongs.isNotEmpty()) {
+                drawerSongs
             } else {
-                withContext(Dispatchers.IO) {
-                    apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
+                val sourceSongs = playlist.musicList.takeIf { it.isNotEmpty() }
+                if (sourceSongs != null) {
+                    sourceSongs
+                } else {
+                    withContext(Dispatchers.IO) {
+                        apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
+                    }
                 }
             }
             if (songs.isNotEmpty()) {
