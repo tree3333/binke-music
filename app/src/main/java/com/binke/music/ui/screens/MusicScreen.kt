@@ -1,6 +1,6 @@
 package com.binke.music.ui.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,9 +69,11 @@ import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import coil.compose.AsyncImage
+import com.binke.music.R
 import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
 import com.binke.music.data.model.Song
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -189,6 +193,11 @@ private fun PortraitMusicScreen(
             .padding(horizontal = 24.xdp(sx)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 轮播图（最顶部）
+        BannerCarousel(sx = sx, sy = sy, su = su)
+
+        Spacer(modifier = Modifier.height(8.ydp(sy)))
+
         // 封面区（固定在上半部分，不可切换，歌词在下方）
         Box(
             modifier = Modifier
@@ -421,6 +430,52 @@ private fun PortraitMusicScreen(
             }
 
             Spacer(modifier = Modifier.height(16.ydp(sy)))
+        }
+    }
+}
+
+@Composable
+private fun BannerCarousel(sx: Float, sy: Float, su: Float) {
+    val bannerResIds = listOf(R.drawable.banner_1, R.drawable.banner_2)
+    var currentIndex by remember { mutableIntStateOf(0) }
+
+    // 3秒自动切换
+    LaunchedEffect(currentIndex) {
+        delay(3000)
+        currentIndex = (currentIndex + 1) % bannerResIds.size
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1080f / 720f)
+            .clip(RoundedCornerShape(12.sdp(su))),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = bannerResIds[currentIndex]),
+            contentDescription = "轮播图${currentIndex + 1}",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        // 指示器（底部居中）
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.ydp(sy)),
+            horizontalArrangement = Arrangement.spacedBy(8.xdp(sx))
+        ) {
+            bannerResIds.forEachIndexed { index, _ ->
+                Box(
+                    modifier = Modifier
+                        .size(width = if (index == currentIndex) 20.xdp(sx) else 8.xdp(sx), height = 8.ydp(sy))
+                        .clip(CircleShape)
+                        .background(
+                            if (index == currentIndex) Color(0xFF7B6DFF) else Color(0x80FFFFFF)
+                        )
+                )
+            }
         }
     }
 }
