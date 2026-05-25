@@ -94,7 +94,6 @@ class MainViewModel(
 
     /** 跟踪当前歌词加载协程，用于切歌时取消 */
     private var lyricsJob: Job? = null
-
     /** 防止 MediaSession 触发的 onMediaItemTransition 与 playSong 之间循环 */
     private var pendingMediaItemTransition = false
 
@@ -169,7 +168,7 @@ class MainViewModel(
                 next()
             }
         }
-        // MediaSession 直接切歌时（锁屏上一首/下一首），同步 index 并直接请求 URL
+        // MediaSession 直接切歌时（锁屏上一首/下一首），直接请求 URL 更新当前项
         musicPlayer.onMediaItemTransition = lambda@{ newIndex ->
             if (pendingMediaItemTransition) return@lambda
             pendingMediaItemTransition = true
@@ -190,11 +189,8 @@ class MainViewModel(
                         if (!playUrl.isNullOrBlank()) {
                             musicPlayer.updateCurrentMediaItem(playUrl, song.name, song.artist, song.pic)
                         }
-                    } catch (_: Exception) {
-                        // 请求失败，静默忽略
-                    }
+                    } catch (_: Exception) { }
                 }
-                // 预加载接下来的歌曲
                 preloadUpcoming()
             }
             pendingMediaItemTransition = false
@@ -374,9 +370,10 @@ class MainViewModel(
 
             // 先建立完整 timeline（供锁屏上一首/下一首使用）
             val playlist = _playlist.value
-            val currentIdx = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
             if (playlist.isNotEmpty()) {
-                musicPlayer.setPlaylist(playlist, currentIdx, song.playUrl)
+                val currentIdx = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                _currentIndex.value = currentIdx
+                musicPlayer.setPlaylist(playlist, currentIdx, playlist[currentIdx].playUrl)
             }
 
             // 封面增强优先：先拿到高清封面再播放，确保播放器从一开始就显示高清图

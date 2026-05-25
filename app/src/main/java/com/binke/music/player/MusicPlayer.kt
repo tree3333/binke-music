@@ -99,11 +99,11 @@ class MusicPlayer(private val context: Context) {
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        player?.let { p ->
-                            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
-                                p.mediaItemCount > 1) {
-                                // 锁屏上一首/下一首触发，ExoPlayer 已切换 currentMediaItemIndex
-                                onMediaItemTransition?.invoke(p.currentMediaItemIndex)
+                        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                            player?.let { p ->
+                                if (p.mediaItemCount > 1) {
+                                    onMediaItemTransition?.invoke(p.currentMediaItemIndex)
+                                }
                             }
                         }
                     }
@@ -149,11 +149,10 @@ class MusicPlayer(private val context: Context) {
             // 播放列表已存在，只更新当前项的 URL，保留 metadata（封面等）
             val idx = p.currentMediaItemIndex
             val currentItem = p.getMediaItemAt(idx)
-            val preservedMetadata = currentItem.mediaMetadata
             val updatedItem = MediaItem.Builder()
                 .setUri(url)
                 .setMimeType("audio/mpeg")
-                .setMediaMetadata(preservedMetadata)
+                .setMediaMetadata(currentItem.mediaMetadata)
                 .build()
             p.replaceMediaItem(idx, updatedItem)
             p.prepare()
