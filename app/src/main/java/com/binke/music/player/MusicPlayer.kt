@@ -45,6 +45,12 @@ class MusicPlayer(private val context: Context) {
     /** MediaSession 直接切歌时触发（锁屏上一首/下一首按钮），返回新索引 */
     var onMediaItemTransition: ((Int) -> Unit)? = null
 
+    /**
+     * 注入切歌时的 URL 提供器（由 ViewModel 设置）。
+     * onMediaItemTransition 触发时调用此函数获取新歌曲的 URL。
+     */
+    var urlProvider: ((String) -> String?)? = null
+
     private val progressRunnable = object : Runnable {
         override fun run() {
             player?.let { p ->
@@ -102,7 +108,20 @@ class MusicPlayer(private val context: Context) {
                         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                             player?.let { p ->
                                 if (p.mediaItemCount > 1) {
-                                    onMediaItemTransition?.invoke(p.currentMediaItemIndex)
+                                    val newIndex = p.currentMediaItemIndex
+                                    val newMediaId = mediaItem?.mediaId
+                                    // 尝试用缓存 URL 替换（ZongTing 方式：URL 已在预取时缓存）
+                                    if (!newMediaId.isNullOrEmpty()) {
+                                        val cachedUrl = urlProvider?.invoke(newMediaId)
+                                        if (!cachedUrl.isNullOrEmpty()) {
+                                            val updatedItem = p.getMediaItemAt(newIndex)
+                                                .buildUpon()
+                                                .setUri(cachedUrl)
+                                                .build()
+                                            p.replaceMediaItem(newIndex, updatedItem)
+                                        }
+                                    }
+                                    onMediaItemTransition?.invoke(newIndex)
                                 }
                             }
                         }
@@ -231,19 +250,17 @@ class MusicPlayer(private val context: Context) {
 
     /**
      * 初始化播放列表（供锁屏上一首/下一首使用）。
-     * 包含当前歌曲 URL + 其余歌曲占位 URL，setMediaItems 只调用一次。
+     * 所有 URL 必须已预取完毕，不允许空 URI。
+     * @param urls rid -> playUrl 的映射，必须包含所有歌曲的 URL
      */
-    fun setPlaylist(songs: List<Song>, currentIndex: Int, currentPlayUrl: String?) {
+    fun setPlaylist(songs: List<Song>, urls: Map<String, String>, currentIndex: Int) {
         player?.let { p ->
             if (songs.isEmpty()) return
             isPlaylistSet = true
             val mediaItems = songs.mapIndexed { i, song ->
-                val url = if (i == currentIndex && !currentPlayUrl.isNullOrEmpty()) {
-                    currentPlayUrl
-                } else {
-                    song.playUrl ?: ""
-                }
+                val url = urls[song.id] ?: ""
                 MediaItem.Builder()
+                    .setMediaId(song.id)
                     .setUri(url)
                     .setMediaMetadata(
                         androidx.media3.common.MediaMetadata.Builder()
