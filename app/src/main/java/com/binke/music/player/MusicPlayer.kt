@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -42,6 +43,8 @@ class MusicPlayer(private val context: Context) {
     var onPlaybackStateChanged: ((Boolean) -> Unit)? = null
     var onPlaybackError: ((String) -> Unit)? = null
     var onTrackEnded: (() -> Unit)? = null
+    /** MediaSession 直接切歌时触发（锁屏上一首/下一首按钮），返回新索引 */
+    var onMediaItemTransition: ((Int) -> Unit)? = null
 
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -95,6 +98,16 @@ class MusicPlayer(private val context: Context) {
                         Log.e(TAG, "onPlayerError code=${error.errorCodeName} msg=${error.message}", error)
                         onPlaybackError?.invoke("[${error.errorCodeName}] ${error.message}")
                     }
+
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        player?.let { p ->
+                            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
+                                p.mediaItemCount > 1) {
+                                // 锁屏上一首/下一首触发，ExoPlayer 已切换 currentMediaItemIndex
+                                onMediaItemTransition?.invoke(p.currentMediaItemIndex)
+                            }
+                        }
+                    }
                 })
             }
 
@@ -133,20 +146,27 @@ class MusicPlayer(private val context: Context) {
             return
         }
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(url)
-            .setMimeType("audio/mpeg")
-            .build()
-
         if (isPlaylistSet && p.mediaItemCount > 0) {
-            // 播放列表已存在（setPlaylist 已调用），只更新当前项的 URL，不清空列表
-            p.replaceMediaItem(p.currentMediaItemIndex, mediaItem)
+            // 播放列表已存在，只更新当前项的 URL，保留 metadata（封面等）
+            val idx = p.currentMediaItemIndex
+            val currentItem = p.getMediaItemAt(idx)
+            val preservedMetadata = currentItem.mediaMetadata
+            val updatedItem = MediaItem.Builder()
+                .setUri(url)
+                .setMimeType("audio/mpeg")
+                .setMediaMetadata(preservedMetadata)
+                .build()
+            p.replaceMediaItem(idx, updatedItem)
             p.prepare()
             p.playWhenReady = true
         } else {
             // 首次播放或无播放列表，清空并设置单个媒体项
             p.stop()
             p.clearMediaItems()
+            val mediaItem = MediaItem.Builder()
+                .setUri(url)
+                .setMimeType("audio/mpeg")
+                .build()
             p.setMediaItem(mediaItem)
             p.prepare()
             p.playWhenReady = true
@@ -245,7 +265,11 @@ class MusicPlayer(private val context: Context) {
      * 更新当前播放索引（用于上一首/下一首逻辑）。
      */
     fun setCurrentIndex(index: Int) {
-        player?.seekToDefaultPosition(index)
+        player?.let { p ->
+            if (index in 0 until p.mediaItemCount) {
+                p.seekTo(index, C.TIME_UNSET)
+            }
+        }
     }
 
     /**

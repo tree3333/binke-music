@@ -95,6 +95,9 @@ class MainViewModel(
     /** 跟踪当前歌词加载协程，用于切歌时取消 */
     private var lyricsJob: Job? = null
 
+    /** 防止 MediaSession 触发的 onMediaItemTransition 与 playSong 之间循环 */
+    private var pendingMediaItemTransition = false
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -165,6 +168,36 @@ class MainViewModel(
             } else {
                 next()
             }
+        }
+        // MediaSession 直接切歌时（锁屏上一首/下一首），同步 index 并直接请求 URL
+        musicPlayer.onMediaItemTransition = lambda@{ newIndex ->
+            if (pendingMediaItemTransition) return@lambda
+            pendingMediaItemTransition = true
+            val playlist = _playlist.value
+            if (newIndex in playlist.indices) {
+                _currentIndex.value = newIndex
+                val song = playlist[newIndex]
+                _currentSong.value = song
+                _currentPosition.value = 0L
+                _duration.value = 0L
+                _lyrics.value = emptyList()
+                // 直接请求播放地址，不用缓存
+                viewModelScope.launch {
+                    try {
+                        val playUrl = withContext(Dispatchers.IO) {
+                            apiService.getPlayUrl(song.musicRid).url
+                        }
+                        if (!playUrl.isNullOrBlank()) {
+                            musicPlayer.updateCurrentMediaItem(playUrl, song.name, song.artist, song.pic)
+                        }
+                    } catch (_: Exception) {
+                        // 请求失败，静默忽略
+                    }
+                }
+                // 预加载接下来的歌曲
+                preloadUpcoming()
+            }
+            pendingMediaItemTransition = false
         }
 
         viewModelScope.launch {
@@ -338,6 +371,13 @@ class MainViewModel(
             _currentPosition.value = 0L
             _duration.value = 0L
             _lyrics.value = emptyList()
+
+            // 先建立完整 timeline（供锁屏上一首/下一首使用）
+            val playlist = _playlist.value
+            val currentIdx = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            if (playlist.isNotEmpty()) {
+                musicPlayer.setPlaylist(playlist, currentIdx, song.playUrl)
+            }
 
             // 封面增强优先：先拿到高清封面再播放，确保播放器从一开始就显示高清图
             val enhancedSong = withContext(Dispatchers.IO) {
