@@ -30,6 +30,10 @@ class MusicPlayer(private val context: Context) {
     private var player: ExoPlayer? = null
     private var isPlaylistSet = false  // true = setPlaylist() 已调用，play() 不应清空列表
     private val handler = Handler(Looper.getMainLooper())
+
+    /** 暴露给 ViewModel 用于恢复时同步状态 */
+    fun getCurrentMediaItem(): MediaItem? = player?.currentMediaItem
+    fun getCurrentMediaItemIndex(): Int = player?.currentMediaItemIndex ?: 0
     private val probeClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)

@@ -94,6 +94,20 @@ class MainViewModel(
 
     /** 跟踪当前歌词加载协程，用于切歌时取消 */
     private var lyricsJob: Job? = null
+    /** 重新加载当前歌曲的歌词（供 onMediaItemTransition 和恢复界面时调用） */
+    private fun reloadLyricsForCurrentSong() {
+        val song = _currentSong.value ?: return
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            val cached = songCache.get(song)?.lyrics
+            if (cached != null) {
+                if (isActive) _lyrics.value = cached
+            } else {
+                val loaded = songCache.loadLyrics(song)
+                if (isActive) _lyrics.value = loaded
+            }
+        }
+    }
     /** 防止 MediaSession 触发的 onMediaItemTransition 与 playSong 之间循环 */
     private var pendingMediaItemTransition = false
 
@@ -180,6 +194,8 @@ class MainViewModel(
                 _duration.value = 0L
                 _lyrics.value = emptyList()
                 preloadUpcoming()
+                // 重新加载当前歌曲的歌词
+                reloadLyricsForCurrentSong()
             }
             pendingMediaItemTransition = false
         }
@@ -187,6 +203,19 @@ class MainViewModel(
         musicPlayer.urlProvider = lambda@{ mediaId ->
             val song = _playlist.value.find { it.id == mediaId }
             song?.let { songCache.get(it)?.playUrl }
+        }
+
+        // APP 被系统杀掉后恢复时，同步当前播放状态（不依赖 onMediaItemTransition）
+        val currentMediaItem = musicPlayer.getCurrentMediaItem()
+        if (currentMediaItem != null) {
+            val mediaId = currentMediaItem.mediaId
+            val idx = musicPlayer.getCurrentMediaItemIndex()
+            val existingSong = _playlist.value.find { it.id == mediaId }
+            if (existingSong != null) {
+                _currentIndex.value = idx
+                _currentSong.value = existingSong
+                reloadLyricsForCurrentSong()
+            }
         }
 
         viewModelScope.launch {
