@@ -377,9 +377,7 @@ class MainViewModel(
                 val playUrl = result
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
-                    musicPlayer.play(playUrl)
-                    // 设置锁屏媒体信息（封面、歌手、歌曲名）
-                    musicPlayer.setMetadata(enhancedSong.name, enhancedSong.artist, enhancedSong.pic)
+                    musicPlayer.play(enhancedSong)
                     _isPlaying.value = true
                     // 开始播放后预加载接下来的 3 首
                     preloadUpcoming()

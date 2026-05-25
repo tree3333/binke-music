@@ -126,22 +126,48 @@ class MusicPlayer(private val context: Context) {
         }
     }
 
-    fun play(url: String) {
+    fun play(song: Song) {
         val p = player ?: run {
             Log.e(TAG, "play() called but player is null — initialize() was not called!")
             return
         }
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(url)
-            .setMimeType("audio/mpeg")
+        // 尝试在现有播放列表中找这首歌（通过 musicRid 匹配）
+        var targetIndex = -1
+        for (i in 0 until p.mediaItemCount) {
+            val existing = p.getMediaItemAt(i)
+            // 用 localConfiguration?.uri 的 fragment 或 query 参数中的 rid 来匹配
+            val uri = existing.localConfiguration?.uri?.toString() ?: ""
+            if (song.playUrl?.isNotEmpty() == true && uri == song.playUrl) {
+                targetIndex = i
+                break
+            }
+        }
+
+        val newItem = MediaItem.Builder()
+            .setUri(song.playUrl ?: "")
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(song.name)
+                    .setArtist(song.artist)
+                    .setArtworkUri(if (song.pic.isNotEmpty()) android.net.Uri.parse(song.pic) else null)
+                    .build()
+            )
             .build()
 
-        p.stop()
-        p.clearMediaItems()
-        p.setMediaItem(mediaItem)
-        p.prepare()
-        p.playWhenReady = true
+        if (targetIndex >= 0) {
+            // 歌已在播放列表中：原地更新 URL + 元数据，seek 到该位置播放
+            p.replaceMediaItem(targetIndex, newItem)
+            p.seekTo(targetIndex, 0)
+            p.playWhenReady = true
+        } else {
+            // 歌不在列表中（单曲播放场景）：替换整个列表
+            p.stop()
+            p.clearMediaItems()
+            p.setMediaItem(newItem)
+            p.prepare()
+            p.playWhenReady = true
+        }
     }
 
     fun pause() {
