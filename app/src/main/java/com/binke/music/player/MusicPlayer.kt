@@ -28,6 +28,7 @@ class MusicPlayer(private val context: Context) {
     )
 
     private var player: ExoPlayer? = null
+    private var isPlaylistSet = false  // true = setPlaylist() 已调用，play() 不应清空列表
     private val handler = Handler(Looper.getMainLooper())
     private val probeClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -126,47 +127,30 @@ class MusicPlayer(private val context: Context) {
         }
     }
 
-    fun play(song: Song) {
+    fun play(url: String) {
         val p = player ?: run {
             Log.e(TAG, "play() called but player is null — initialize() was not called!")
             return
         }
 
-        // 尝试在现有播放列表中找这首歌（通过 musicRid 匹配）
-        var targetIndex = -1
-        for (i in 0 until p.mediaItemCount) {
-            val existing = p.getMediaItemAt(i)
-            // 用 localConfiguration?.uri 的 fragment 或 query 参数中的 rid 来匹配
-            val uri = existing.localConfiguration?.uri?.toString() ?: ""
-            if (song.playUrl?.isNotEmpty() == true && uri == song.playUrl) {
-                targetIndex = i
-                break
-            }
-        }
-
-        val newItem = MediaItem.Builder()
-            .setUri(song.playUrl ?: "")
-            .setMediaMetadata(
-                androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(song.name)
-                    .setArtist(song.artist)
-                    .setArtworkUri(if (song.pic.isNotEmpty()) android.net.Uri.parse(song.pic) else null)
-                    .build()
-            )
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
+            .setMimeType("audio/mpeg")
             .build()
 
-        if (targetIndex >= 0) {
-            // 歌已在播放列表中：原地更新 URL + 元数据，seek 到该位置播放
-            p.replaceMediaItem(targetIndex, newItem)
-            p.seekTo(targetIndex, 0)
-            p.playWhenReady = true
-        } else {
-            // 歌不在列表中（单曲播放场景）：替换整个列表
-            p.stop()
-            p.clearMediaItems()
-            p.setMediaItem(newItem)
+        if (isPlaylistSet && p.mediaItemCount > 0) {
+            // 播放列表已存在（setPlaylist 已调用），只更新当前项的 URL，不清空列表
+            p.replaceMediaItem(p.currentMediaItemIndex, mediaItem)
             p.prepare()
             p.playWhenReady = true
+        } else {
+            // 首次播放或无播放列表，清空并设置单个媒体项
+            p.stop()
+            p.clearMediaItems()
+            p.setMediaItem(mediaItem)
+            p.prepare()
+            p.playWhenReady = true
+            isPlaylistSet = true
         }
     }
 
@@ -228,15 +212,21 @@ class MusicPlayer(private val context: Context) {
     }
 
     /**
-     * 同步播放列表到 ExoPlayer（供 MediaSession 显示上一首/下一首按钮）。
-     * 第一个参数为 Song 对象列表，第二个参数为当前播放索引。
+     * 初始化播放列表（供锁屏上一首/下一首使用）。
+     * 包含当前歌曲 URL + 其余歌曲占位 URL，setMediaItems 只调用一次。
      */
-    fun setPlaylist(songs: List<Song>, currentIndex: Int) {
+    fun setPlaylist(songs: List<Song>, currentIndex: Int, currentPlayUrl: String?) {
         player?.let { p ->
             if (songs.isEmpty()) return
-            val mediaItems = songs.map { song ->
+            isPlaylistSet = true
+            val mediaItems = songs.mapIndexed { i, song ->
+                val url = if (i == currentIndex && !currentPlayUrl.isNullOrEmpty()) {
+                    currentPlayUrl
+                } else {
+                    song.playUrl ?: ""
+                }
                 MediaItem.Builder()
-                    .setUri(song.playUrl ?: "")
+                    .setUri(url)
                     .setMediaMetadata(
                         androidx.media3.common.MediaMetadata.Builder()
                             .setTitle(song.name)
@@ -247,15 +237,36 @@ class MusicPlayer(private val context: Context) {
                     .build()
             }
             p.setMediaItems(mediaItems, currentIndex, 0)
-            // 不在这里 prepare 和 play，由 play() 方法负责
+            // 不在这里 prepare，由 play() 负责
         }
     }
 
     /**
-     * 更新当前播放位置（用于上一首/下一首逻辑）。
+     * 更新当前播放索引（用于上一首/下一首逻辑）。
      */
     fun setCurrentIndex(index: Int) {
         player?.seekToDefaultPosition(index)
+    }
+
+    /**
+     * 替换当前播放项的 URL（在 setPlaylist 之后调用，确保正在播放的歌曲 URL 是真实可用的）。
+     */
+    fun updateCurrentMediaItem(url: String, name: String, artist: String, artUri: String) {
+        player?.let { p ->
+            if (p.mediaItemCount > 0) {
+                val updatedItem = MediaItem.Builder()
+                    .setUri(url)
+                    .setMediaMetadata(
+                        androidx.media3.common.MediaMetadata.Builder()
+                            .setTitle(name)
+                            .setArtist(artist)
+                            .setArtworkUri(if (artUri.isNotEmpty()) android.net.Uri.parse(artUri) else null)
+                            .build()
+                    )
+                    .build()
+                p.replaceMediaItem(p.currentMediaItemIndex, updatedItem)
+            }
+        }
     }
 
     companion object {

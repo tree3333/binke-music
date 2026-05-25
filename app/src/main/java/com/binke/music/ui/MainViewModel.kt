@@ -244,7 +244,7 @@ class MainViewModel(
                 _currentIndex.value = idx
                 _playlistSource.value = PlaylistSource.NONE
                 // 同步播放列表到 ExoPlayer（供锁屏上一首/下一首按钮使用）
-                musicPlayer.setPlaylist(songs, idx)
+                musicPlayer.setPlaylist(songs, idx, songs[idx].playUrl)
                 closePlaylistDrawer()
                 setTab(1)
                 SongCache.getAppContext()?.let { songCache.awaitPendingBitmaps(listOf(songs[idx])) }
@@ -377,7 +377,9 @@ class MainViewModel(
                 val playUrl = result
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
-                    musicPlayer.play(enhancedSong)
+                    musicPlayer.play(playUrl)
+                    // 设置锁屏媒体信息（封面、歌手、歌曲名）
+                    musicPlayer.setMetadata(enhancedSong.name, enhancedSong.artist, enhancedSong.pic)
                     _isPlaying.value = true
                     // 开始播放后预加载接下来的 3 首
                     preloadUpcoming()
@@ -479,7 +481,7 @@ class MainViewModel(
             _playlist.value = favs
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.FAVORITES
-            musicPlayer.setPlaylist(favs, 0)
+            musicPlayer.setPlaylist(favs, 0, favs[0].playUrl)
             setTab(1)
             playSongAt(0)
         }
@@ -491,7 +493,7 @@ class MainViewModel(
             _playlist.value = hist
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.HISTORY
-            musicPlayer.setPlaylist(hist, 0)
+            musicPlayer.setPlaylist(hist, 0, hist[0].playUrl)
             setTab(1)
             playSongAt(0)
         }
@@ -502,7 +504,7 @@ class MainViewModel(
             _playlist.value = playlist.musicList
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.CUSTOM
-            musicPlayer.setPlaylist(playlist.musicList, 0)
+            musicPlayer.setPlaylist(playlist.musicList, 0, playlist.musicList[0].playUrl)
             setTab(1)
             playSongAt(0)
         }
