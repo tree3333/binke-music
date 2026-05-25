@@ -154,9 +154,11 @@ fun MineScreen(
             verticalArrangement = Arrangement.spacedBy(18.ydp(sy)),
             modifier = Modifier.fillMaxSize()
         ) {
-            // 轮播图（最顶部，占满整行）
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                BannerCarousel(sx = sx, sy = sy, su = su)
+            // 轮播图（竖屏最顶部，占满整行）
+            if (isPortrait) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    BannerCarousel(sx = sx, sy = sy, su = su)
+                }
             }
 
             items(tiles) { playlist ->
