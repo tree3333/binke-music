@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -265,11 +264,7 @@ class MusicPlayer(private val context: Context) {
      * 更新当前播放索引（用于上一首/下一首逻辑）。
      */
     fun setCurrentIndex(index: Int) {
-        player?.let { p ->
-            if (index in 0 until p.mediaItemCount) {
-                p.seekTo(index, C.TIME_UNSET)
-            }
-        }
+        player?.seekToDefaultPosition(index)
     }
 
     /**
