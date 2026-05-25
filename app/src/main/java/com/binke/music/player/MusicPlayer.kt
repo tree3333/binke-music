@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import com.binke.music.data.model.Song
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -198,6 +199,37 @@ class MusicPlayer(private val context: Context) {
 
     fun setRepeatMode(mode: Int) {
         player?.repeatMode = mode
+    }
+
+    /**
+     * 同步播放列表到 ExoPlayer（供 MediaSession 显示上一首/下一首按钮）。
+     * 第一个参数为 Song 对象列表，第二个参数为当前播放索引。
+     */
+    fun setPlaylist(songs: List<Song>, currentIndex: Int) {
+        player?.let { p ->
+            if (songs.isEmpty()) return
+            val mediaItems = songs.map { song ->
+                MediaItem.Builder()
+                    .setUri(song.playUrl ?: "")
+                    .setMediaMetadata(
+                        androidx.media3.common.MediaMetadata.Builder()
+                            .setTitle(song.name)
+                            .setArtist(song.artist)
+                            .setArtworkUri(if (song.pic.isNotEmpty()) android.net.Uri.parse(song.pic) else null)
+                            .build()
+                    )
+                    .build()
+            }
+            p.setMediaItems(mediaItems, currentIndex, 0)
+            // 不在这里 prepare 和 play，由 play() 方法负责
+        }
+    }
+
+    /**
+     * 更新当前播放位置（用于上一首/下一首逻辑）。
+     */
+    fun setCurrentIndex(index: Int) {
+        player?.seekToDefaultPosition(index)
     }
 
     companion object {

@@ -239,13 +239,16 @@ class MainViewModel(
                     apiService.getPlaylistDetail(playlist.id, rn = 100)?.musicList.orEmpty()
                 }
             if (songs.isNotEmpty()) {
+                val idx = startIndex.coerceIn(0, songs.lastIndex)
                 _playlist.value = songs
-                _currentIndex.value = startIndex.coerceIn(0, songs.lastIndex)
+                _currentIndex.value = idx
                 _playlistSource.value = PlaylistSource.NONE
+                // 同步播放列表到 ExoPlayer（供锁屏上一首/下一首按钮使用）
+                musicPlayer.setPlaylist(songs, idx)
                 closePlaylistDrawer()
                 setTab(1)
-                SongCache.getAppContext()?.let { songCache.awaitPendingBitmaps(listOf(songs[startIndex.coerceIn(0, songs.lastIndex)])) }
-                playSongAt(_currentIndex.value)
+                SongCache.getAppContext()?.let { songCache.awaitPendingBitmaps(listOf(songs[idx])) }
+                playSongAt(idx)
             }
         }
     }
@@ -266,6 +269,11 @@ class MainViewModel(
 
     fun previous() {
         if (_playlist.value.isEmpty()) return
+        // 标准行为：播放位置超过3秒则重唱到开头，否则切到上一首
+        if (musicPlayer.currentPosition() > 3000) {
+            seekTo(0)
+            return
+        }
         val newIndex = when (_playMode.value) {
             PlayMode.SINGLE_LOOP -> _currentIndex.value.coerceAtLeast(0)
             PlayMode.SHUFFLE -> _playlist.value.indices.random()
@@ -314,6 +322,8 @@ class MainViewModel(
     fun playSongAt(index: Int) {
         if (index !in _playlist.value.indices) return
         _currentIndex.value = index
+        // 同步当前索引到 ExoPlayer（供 MediaSession 上一首/下一首使用）
+        musicPlayer.setCurrentIndex(index)
         playSong(_playlist.value[index])
     }
 
@@ -368,6 +378,8 @@ class MainViewModel(
                 if (!playUrl.isNullOrBlank()) {
                     _playbackDebugParams.value = buildPlaybackParams(playUrl)
                     musicPlayer.play(playUrl)
+                    // 设置锁屏媒体信息（封面、歌手、歌曲名）
+                    musicPlayer.setMetadata(enhancedSong.name, enhancedSong.artist, enhancedSong.pic)
                     _isPlaying.value = true
                     // 开始播放后预加载接下来的 3 首
                     preloadUpcoming()
@@ -469,6 +481,7 @@ class MainViewModel(
             _playlist.value = favs
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.FAVORITES
+            musicPlayer.setPlaylist(favs, 0)
             setTab(1)
             playSongAt(0)
         }
@@ -480,6 +493,7 @@ class MainViewModel(
             _playlist.value = hist
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.HISTORY
+            musicPlayer.setPlaylist(hist, 0)
             setTab(1)
             playSongAt(0)
         }
@@ -490,7 +504,7 @@ class MainViewModel(
             _playlist.value = playlist.musicList
             _currentIndex.value = 0
             _playlistSource.value = PlaylistSource.CUSTOM
-            _currentCustomPlaylistId.value = playlist.id
+            musicPlayer.setPlaylist(playlist.musicList, 0)
             setTab(1)
             playSongAt(0)
         }
