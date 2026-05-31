@@ -380,11 +380,26 @@ class MainViewModel(
         // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
         lyricsJob?.cancel()
 
-        // 如果点击的歌不在当前播放列表（常见于搜索结果点击），直接建新列表从头播
+        // 同步快照：playSong 启动时的完整播放上下文，防止后续调用覆盖 _playlist.value 后
+        // 协程体内仍用旧快照（urlMapDeferred/currentIdx）但 setPlaylist 却用新列表
+        val snapshotPlaylist: List<Song>
+        val snapshotIdx: Int
+        val snapshotSong: Song
+
         if (_playlist.value.none { it.id == song.id }) {
-            _playlist.value = listOf(song)
-            _currentIndex.value = 0
+            // 搜索结果点击：单首歌列表
+            snapshotPlaylist = listOf(song)
+            snapshotIdx = 0
+            snapshotSong = song
+            _playlist.value = snapshotPlaylist
+            _currentIndex.value = snapshotIdx
             _playlistSource.value = PlaylistSource.NONE
+        } else {
+            // 同列表内切歌：用当前列表快照和对应索引
+            snapshotPlaylist = _playlist.value
+            snapshotIdx = snapshotPlaylist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            snapshotSong = song
+            _currentIndex.value = snapshotIdx
         }
 
         viewModelScope.launch {
@@ -395,110 +410,60 @@ class MainViewModel(
             _duration.value = 0L
             _lyrics.value = emptyList()
 
-            // 先建立完整 timeline（供锁屏上一首/下一首使用）
-            // 预取全部歌曲的 URL，确保 setPlaylist 时所有 MediaItem 的 URI 都已就绪
-            val playlist = _playlist.value
-            val currentIdx = if (playlist.isNotEmpty()) {
-                playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-            } else -1
-            if (currentIdx >= 0) {
-                _currentIndex.value = currentIdx
-                // 并发预取所有歌曲的 URL
-                val urlMapDeferred = viewModelScope.async(Dispatchers.IO) {
-                    playlist.map { s ->
-                        async {
-                            val url: String = songCache.get(s)?.playUrl
-                                ?: apiService.getPlayUrl(s.musicRid).url.orEmpty()
-                            s.id to url
-                        }
-                    }.awaitAll().filter { (_, url) -> url.isNotBlank() }.toMap()
-                }
-                // 封面增强优先
-                val enhancedSong = withContext(Dispatchers.IO) {
-                    if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                        val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                        if (itunesPic.isNotBlank()) return@withContext song.copy(pic = itunesPic)
-                        val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                        if (neteasePic.isNotBlank()) return@withContext song.copy(pic = neteasePic)
+            // 并发预取所有歌曲的 URL（用快照 playlist）
+            val urlMapDeferred = viewModelScope.async(Dispatchers.IO) {
+                snapshotPlaylist.map { s ->
+                    async {
+                        val url: String = songCache.get(s)?.playUrl
+                            ?: apiService.getPlayUrl(s.musicRid).url.orEmpty()
+                        s.id to url
                     }
-                    song
+                }.awaitAll().filter { (_, url) -> url.isNotBlank() }.toMap()
+            }
+            // 封面增强优先
+            val enhancedSong = withContext(Dispatchers.IO) {
+                if (snapshotSong.artist.isNotBlank() && snapshotSong.name.isNotBlank()) {
+                    val itunesPic = apiService.getCoverFromItunes(snapshotSong.artist, snapshotSong.name)
+                    if (itunesPic.isNotBlank()) return@withContext snapshotSong.copy(pic = itunesPic)
+                    val neteasePic = apiService.getCoverFromNetEase(snapshotSong.artist, snapshotSong.name)
+                    if (neteasePic.isNotBlank()) return@withContext snapshotSong.copy(pic = neteasePic)
                 }
-                _currentSong.value = enhancedSong
-                val idx = _playlist.value.indexOfFirst { it.id == song.id }
-                if (idx >= 0) {
-                    val updatedList = _playlist.value.toMutableList()
-                    updatedList[idx] = enhancedSong
-                    _playlist.value = updatedList
-                }
-                repository.addToHistory(enhancedSong)
-                refreshHistory()
+                snapshotSong
+            }
+            _currentSong.value = enhancedSong
+            // 用快照 playlist 更新封面（同步进行，不影响 urlMapDeferred）
+            val updatedList = snapshotPlaylist.toMutableList()
+            val idxInSnapshot = updatedList.indexOfFirst { it.id == snapshotSong.id }
+            if (idxInSnapshot >= 0) {
+                updatedList[idxInSnapshot] = enhancedSong
+            }
+            _playlist.value = updatedList
+            repository.addToHistory(enhancedSong)
+            refreshHistory()
 
-                // 等所有 URL 预取完毕，再设置播放列表（所有 MediaItem 都有真实 URL）
-                val urlMap = urlMapDeferred.await()
-                musicPlayer.setPlaylist(_playlist.value, urlMap, currentIdx)
+            // 等所有 URL 预取完毕，再设置播放列表（所有 MediaItem 都有真实 URL）
+            val urlMap = urlMapDeferred.await()
+            musicPlayer.setPlaylist(updatedList, urlMap, snapshotIdx)
 
-                val playUrl = urlMap[_playlist.value[currentIdx].id]
-                if (!playUrl.isNullOrBlank()) {
-                    _playbackDebugParams.value = buildPlaybackParams(playUrl)
-                    musicPlayer.play(playUrl)
-                    _isPlaying.value = true
-                    preloadUpcoming()
-                } else {
-                    _playbackDebugParams.value = buildPlaybackParams(null)
-                    _playbackError.value = "未获取到播放地址"
-                }
-
-                // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
-                lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                    val cachedLyrics = songCache.get(enhancedSong)?.lyrics
-                    if (cachedLyrics != null) {
-                        if (isActive) _lyrics.value = cachedLyrics
-                    } else {
-                        val lyrics = songCache.loadLyrics(enhancedSong)
-                        if (isActive) _lyrics.value = lyrics
-                    }
-                }
+            val playUrl = urlMap[updatedList.getOrNull(snapshotIdx)?.id]
+            if (!playUrl.isNullOrBlank()) {
+                _playbackDebugParams.value = buildPlaybackParams(playUrl)
+                musicPlayer.play(playUrl)
+                _isPlaying.value = true
+                preloadUpcoming()
             } else {
-                // 无播放列表上下文（单首歌），走原有逻辑
-                val enhancedSong = withContext(Dispatchers.IO) {
-                    if (song.artist.isNotBlank() && song.name.isNotBlank()) {
-                        val itunesPic = apiService.getCoverFromItunes(song.artist, song.name)
-                        if (itunesPic.isNotBlank()) return@withContext song.copy(pic = itunesPic)
-                        val neteasePic = apiService.getCoverFromNetEase(song.artist, song.name)
-                        if (neteasePic.isNotBlank()) return@withContext song.copy(pic = neteasePic)
-                    }
-                    song
-                }
-                _currentSong.value = enhancedSong
-                repository.addToHistory(enhancedSong)
-                refreshHistory()
-                val playUrlDeferred = viewModelScope.async(Dispatchers.IO) {
-                    val cached = songCache.get(enhancedSong)
-                    if (cached?.playUrl != null) cached.playUrl
-                    else {
-                        val url = apiService.getPlayUrl(enhancedSong.musicRid).url
-                        songCache.preloadPlayUrls(listOf(enhancedSong))
-                        url
-                    }
-                }
-                val playUrl = playUrlDeferred.await()
-                if (!playUrl.isNullOrBlank()) {
-                    _playbackDebugParams.value = buildPlaybackParams(playUrl)
-                    musicPlayer.play(playUrl)
-                    musicPlayer.setMetadata(enhancedSong.name, enhancedSong.artist, enhancedSong.pic)
-                    _isPlaying.value = true
+                _playbackDebugParams.value = buildPlaybackParams(null)
+                _playbackError.value = "未获取到播放地址"
+            }
+
+            // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
+            lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+                val cachedLyrics = songCache.get(enhancedSong)?.lyrics
+                if (cachedLyrics != null) {
+                    if (isActive) _lyrics.value = cachedLyrics
                 } else {
-                    _playbackDebugParams.value = buildPlaybackParams(null)
-                    _playbackError.value = "未获取到播放地址"
-                }
-                lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                    val cachedLyrics = songCache.get(enhancedSong)?.lyrics
-                    if (cachedLyrics != null) {
-                        if (isActive) _lyrics.value = cachedLyrics
-                    } else {
-                        val lyrics = songCache.loadLyrics(enhancedSong)
-                        if (isActive) _lyrics.value = lyrics
-                    }
+                    val lyrics = songCache.loadLyrics(enhancedSong)
+                    if (isActive) _lyrics.value = lyrics
                 }
             }
             _isLoading.value = false
