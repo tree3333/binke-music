@@ -87,25 +87,27 @@ class SongCache(private val apiService: KuwoApiService) {
             delay(500)
         }
 
-        // QQ 歌词兜底
+        // 网易云歌词兜底
         if (lyrics.isEmpty()) {
-            var qr = apiService.searchLyricsQQ(song.name, song.artist)
+            val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
+            var nr = apiService.searchLyricsNetEase(cleanName, song.artist)
             for (attempt in 0..2) {
-                if (qr.isSuccess) {
-                    val qq = qr.getOrNull() ?: emptyList()
-                    if (qq.isNotEmpty()) { lyrics = qq; break }
+                if (nr.isSuccess) {
+                    val ne = nr.getOrNull() ?: emptyList()
+                    if (ne.isNotEmpty()) { lyrics = ne; break }
                 }
                 delay(500)
             }
         }
 
-        // 网易云歌词兜底
+        // QQ 歌词兜底
         if (lyrics.isEmpty()) {
-            var nr = apiService.searchLyricsNetEase(song.name, song.artist)
+            val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
+            var qr = apiService.searchLyricsQQ(cleanName, song.artist)
             for (attempt in 0..2) {
-                if (nr.isSuccess) {
-                    val ne = nr.getOrNull() ?: emptyList()
-                    if (ne.isNotEmpty()) { lyrics = ne; break }
+                if (qr.isSuccess) {
+                    val qq = qr.getOrNull() ?: emptyList()
+                    if (qq.isNotEmpty()) { lyrics = qq; break }
                 }
                 delay(500)
             }

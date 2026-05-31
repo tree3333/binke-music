@@ -380,6 +380,13 @@ class MainViewModel(
         // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
         lyricsJob?.cancel()
 
+        // 如果点击的歌不在当前播放列表（常见于搜索结果点击），直接建新列表从头播
+        if (_playlist.value.none { it.id == song.id }) {
+            _playlist.value = listOf(song)
+            _currentIndex.value = 0
+            _playlistSource.value = PlaylistSource.NONE
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             _playbackError.value = null
