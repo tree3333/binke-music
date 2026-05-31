@@ -473,10 +473,11 @@ class KuwoApiService {
      */
     fun searchLyricsNetEase(name: String, artist: String): Result<List<LrcLine>> {
         return try {
+            // 搜索时用"歌名 歌手名"，并在结果中严格匹配歌手
             val searchName = "${name.trim()} ${artist.trim()}"
             val encoded = URLEncoder.encode(searchName, "UTF-8")
             val searchUrl = "https://music.163.com/api/search/get"
-            val body = "s=$encoded&type=1&limit=1&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
+            val body = "s=$encoded&type=1&limit=5&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
             val request = Request.Builder()
                 .url(searchUrl)
                 .post(body)
@@ -487,7 +488,24 @@ class KuwoApiService {
             val searchJson = JSONObject(respStr)
             val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return Result.success(emptyList())
             if (songs.length() == 0) return Result.success(emptyList())
-            val songId = songs.getJSONObject(0).optString("id") ?: return Result.success(emptyList())
+
+            // 在前5个结果中匹配歌手名（排除"周杰伦-"这类带后缀的误匹配）
+            var songId: String? = null
+            for (i in 0 until minOf(5, songs.length())) {
+                val s = songs.getJSONObject(i)
+                val artists = s.optJSONArray("artists")
+                val matched = (0 until (artists?.length() ?: 0)).any { idx ->
+                    val an = artists.getJSONObject(idx).optString("name", "")
+                    // 精确匹配或前缀匹配（排除"周杰伦-"这种带后缀的）
+                    (an == artist.trim()) || (artist.isNotBlank() && an.startsWith(artist.trim()) && (an.length == artist.trim().length || an[artist.trim().length] == ' '))
+                }
+                if (matched) {
+                    songId = s.optString("id")
+                    break
+                }
+            }
+            // 没找到精确匹配，取第一首（防止完全搜不到）
+            if (songId == null) songId = songs.getJSONObject(0).optString("id")
 
             val lrcUrl = "https://music.163.com/api/song/lyric?id=$songId&lv=1&kv=1&tv=-1"
             val lrcRequest = Request.Builder()
@@ -559,6 +577,36 @@ class KuwoApiService {
             Result.success(parseLrcText(lrcText))
         } catch (e: Exception) {
             Log.e("KuwoApi", "searchLyricsQQ error", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * lrclib.net 公共歌词库（备用）
+     * @return Result.success(list) 或 Result.failure(exception)
+     */
+    fun searchLyricsLrclib(name: String, artist: String): Result<List<LrcLine>> {
+        return try {
+            val trackEncoded = URLEncoder.encode(name.trim(), "UTF-8")
+            val artistEncoded = URLEncoder.encode(artist.trim(), "UTF-8")
+            val url = "https://lrclib.net/api/get?artist_name=$artistEncoded&track_name=$trackEncoded"
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("User-Agent", BROWSER_UA)
+                .build()
+            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return Result.failure(Exception("lrclib请求为空")) }
+            val json = JSONObject(respStr)
+            val syncedLyrics = json.optString("syncedLyrics", "")
+            if (syncedLyrics.isBlank()) {
+                val plainLyrics = json.optString("plainLyrics", "")
+                if (plainLyrics.isBlank()) return Result.success(emptyList())
+                // 纯文本歌词转同步格式（无时间戳，每行一句）
+                return Result.success(parseLrcText("[00:00]$plainLyrics"))
+            }
+            Result.success(parseLrcText(syncedLyrics))
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "searchLyricsLrclib error", e)
             Result.failure(e)
         }
     }

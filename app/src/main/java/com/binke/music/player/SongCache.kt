@@ -113,6 +113,19 @@ class SongCache(private val apiService: KuwoApiService) {
             }
         }
 
+        // lrclib.net 公共歌词库兜底
+        if (lyrics.isEmpty()) {
+            val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
+            var lr = apiService.searchLyricsLrclib(cleanName, song.artist)
+            for (attempt in 0..1) {
+                if (lr.isSuccess) {
+                    val lb = lr.getOrNull() ?: emptyList()
+                    if (lb.isNotEmpty()) { lyrics = lb; break }
+                }
+                delay(300)
+            }
+        }
+
         // 写缓存
         val existing = cache[song.id]
         cache[song.id] = Entry(
