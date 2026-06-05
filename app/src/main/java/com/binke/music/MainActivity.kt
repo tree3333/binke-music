@@ -340,7 +340,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 TopBar(
                     currentTab = currentTab,
                     onTabSelected = { viewModel.setTab(it) },
-                    onSearchClick = { viewModel.navigateTo(Page.SEARCH) }
+                    onSearchClick = { viewModel.navigateTo(Page.SEARCH) },
+                    coverColors = coverColors
                 )
             }
 

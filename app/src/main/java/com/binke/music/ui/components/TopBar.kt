@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import com.binke.music.ui.theme.CoverColorPredictor
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,18 +39,24 @@ private fun Int.sdp(su: Float): Dp = (this * su).dp
 fun TopBar(
     currentTab: Int,
     onTabSelected: (Int) -> Unit,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple
 ) {
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
 
+    val isMusic = currentTab == 1
+    // 音乐 tab：氛围背景 + 搜索框用 nl；其他 tab 保持原色
+    val barBg = if (isMusic) coverColors.bg else Color(0xFF161616)
+    val searchBg = if (isMusic) coverColors.nl else Color(0xFF26262B)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(110.ydp(sy))
-            .background(Color(0xFF161616))
+            .background(barBg)
             .padding(horizontal = 40.xdp(sx)),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -70,7 +77,7 @@ fun TopBar(
             modifier = Modifier
                 .width(420.xdp(sx))
                 .height(58.ydp(sy))
-                .background(Color(0xFF26262B), RoundedCornerShape(30.sdp(su)))
+                .background(searchBg, RoundedCornerShape(30.sdp(su)))
                 .clickable(onClick = onSearchClick),
             contentAlignment = Alignment.CenterStart
         ) {

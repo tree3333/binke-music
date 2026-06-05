@@ -465,17 +465,13 @@ private fun LandscapeMusicScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF121212))
+            .background(coverColors.bg)
     ) {
         Box(
             modifier = Modifier
                 .weight(1.2f)
                 .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF1A1A1A), Color(0xFF121212))
-                    )
-                )
+                .background(coverColors.bg)
                 .padding(horizontal = 36.xdp(sx), vertical = 28.ydp(sy))
                 .pointerInput(Unit) {
                     var accumulatedDrag = 0f
@@ -751,7 +747,7 @@ private fun LandscapeMusicScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Color(0xFF171717))
+                .background(coverColors.bg)
                 .padding(horizontal = 28.xdp(sx), vertical = 16.ydp(sy))
         ) {
             LyricsView(
@@ -802,11 +798,8 @@ private fun LyricsView(
     ) {
         itemsIndexed(lyrics) { index, line ->
             val active = index == currentLineIndex
-            val textColor = if (isPortrait) {
-                if (active) coverColors.pl else coverColors.nl
-            } else {
-                if (active) Color.White else Color(0xFF9A9A9F)
-            }
+            // 高亮 pl，非高亮 nl（横竖屏统一用封面推理色）
+            val textColor = if (active) coverColors.pl else coverColors.nl
             Text(
                 text = line.text,
                 color = textColor,
