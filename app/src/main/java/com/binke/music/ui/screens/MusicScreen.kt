@@ -74,6 +74,7 @@ import com.binke.music.R
 import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
 import com.binke.music.data.model.Song
+import com.binke.music.ui.theme.CoverColorPredictor
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -104,7 +105,8 @@ fun MusicScreen(
     onOpenQueue: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onSeek: (Long) -> Unit,
-    onLyricSeekToLine: (Int) -> Unit
+    onLyricSeekToLine: (Int) -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple
 ) {
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
@@ -135,6 +137,7 @@ fun MusicScreen(
             onAddToPlaylist = onAddToPlaylist,
             onSeek = onSeek,
             onLyricSeekToLine = onLyricSeekToLine,
+            coverColors = coverColors,
             sx = sx, sy = sy, su = su
         )
     } else {
@@ -157,6 +160,7 @@ fun MusicScreen(
             onAddToPlaylist = onAddToPlaylist,
             onSeek = onSeek,
             onLyricSeekToLine = onLyricSeekToLine,
+            coverColors = coverColors,
             sx = sx, sy = sy, su = su,
             swipeOffset = swipeOffset,
             isSwiping = isSwiping,
@@ -185,12 +189,13 @@ private fun PortraitMusicScreen(
     onAddToPlaylist: () -> Unit,
     onSeek: (Long) -> Unit,
     onLyricSeekToLine: (Int) -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple,
     sx: Float, sy: Float, su: Float
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF121212))
+            .background(coverColors.bg)
             .padding(horizontal = 24.xdp(sx)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -229,7 +234,8 @@ private fun PortraitMusicScreen(
                     sy = sy, su = su,
                     lyrics = lyrics,
                     currentPosition = currentPosition,
-                    onLineClick = onLyricSeekToLine
+                    onLineClick = onLyricSeekToLine,
+                    coverColors = coverColors
                 )
             }
         }
@@ -449,6 +455,7 @@ private fun LandscapeMusicScreen(
     onAddToPlaylist: () -> Unit,
     onSeek: (Long) -> Unit,
     onLyricSeekToLine: (Int) -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple,
     sx: Float, sy: Float, su: Float,
     swipeOffset: Float,
     isSwiping: Boolean,
@@ -752,7 +759,9 @@ private fun LandscapeMusicScreen(
                 su = su,
                 lyrics = lyrics,
                 currentPosition = currentPosition,
-                onLineClick = onLyricSeekToLine
+                onLineClick = onLyricSeekToLine,
+                coverColors = coverColors,
+                isPortrait = false
             )
         }
     }
@@ -765,7 +774,9 @@ private fun LyricsView(
     su: Float,
     lyrics: List<LrcLine>,
     currentPosition: Long,
-    onLineClick: (Int) -> Unit
+    onLineClick: (Int) -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple,
+    isPortrait: Boolean = true
 ) {
     val listState = rememberLazyListState()
     val currentSec = currentPosition / 1000f
@@ -791,9 +802,14 @@ private fun LyricsView(
     ) {
         itemsIndexed(lyrics) { index, line ->
             val active = index == currentLineIndex
+            val textColor = if (isPortrait) {
+                if (active) coverColors.pl else coverColors.nl
+            } else {
+                if (active) Color.White else Color(0xFF9A9A9F)
+            }
             Text(
                 text = line.text,
-                color = if (active) Color.White else Color(0xFF9A9A9F),
+                color = textColor,
                 fontSize = if (active) (52 * su).sp else (44 * su).sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = if (active) (72 * su).sp else (60 * su).sp,

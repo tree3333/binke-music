@@ -96,6 +96,10 @@ dependencies {
     
     // JSON
     implementation("org.json:json:20231013")
+
+    // TensorFlow Lite (cover color prediction, 7 int8 models, 3.73MB total)
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
