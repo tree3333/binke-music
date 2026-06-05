@@ -31,7 +31,8 @@ class BinkeMusicApp : Application(), ImageLoaderFactory {
         try {
             apiService = KuwoApiService()
             musicRepository = MusicRepository(this)
-            // 批 1: musicPlayer 暂时不 initialize（ExoPlayer/Media3 重写放到 Batch 2）
+            // 批 2: musicPlayer 注入 (ExoPlayer 2.19.1 + MediaSessionCompat)
+            musicPlayer = MusicPlayer(this).also { it.initialize(this) }
         } catch (e: Throwable) {
             android.util.Log.e(TAG, "初始化失败", e)
         }

@@ -52,13 +52,12 @@ class MainActivity : AppCompatActivity(), MediaControllerCallback {
     private fun startPlaybackService() {
         val intent = Intent(this, PlaybackService::class.java)
         try {
-            // 批 1: PlaybackService 还在 archive，注释掉避免编译失败
-            // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            //     startForegroundService(intent)
-            // } else {
-            //     startService(intent)
-            // }
-            Log.d(TAG, "PlaybackService start skipped (Batch 1 scaffolding)")
+            // 批 2: 启动 MediaSessionCompat 后台服务（API 19 用 startService，无 startForegroundService）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start PlaybackService", e)
         }

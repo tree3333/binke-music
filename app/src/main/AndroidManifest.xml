@@ -44,13 +44,12 @@
         </receiver>
 
         <!-- MediaSession Service：注册后系统媒体按钮会路由到此处 -->
-        <!-- 必须同时注册旧版 action (androidx.media)，legacy MediaButtonReceiver 只能找到旧版 -->
+        <!-- androidx.media.session.MediaSessionService action 是旧版 MediaSessionCompat 的标准 action -->
         <service
             android:name=".player.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="androidx.media.session.MediaSessionService" />
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
