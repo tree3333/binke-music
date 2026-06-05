@@ -57,19 +57,15 @@ fun BottomNav(
         modifier = Modifier
             .fillMaxWidth()
             .height(140.ydp(sy))
-            .background(coverColors.bg),
+            // 氛围背景只在音乐 tab 生效，其他 tab 用原深灰
+            .background(if (currentTab == 1) coverColors.bg else Color(0xFF161616)),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         navItems.forEachIndexed { index, item ->
             val selected = currentTab == index
-            // 选中用原紫色高亮；未选中按 tab 名: 音乐→pl, 推荐/我的→nl
-            val isMusic = item.label == "音乐"
-            val tint = when {
-                selected -> Color(0xFF7B6DFF)
-                isMusic -> coverColors.pl
-                else -> coverColors.nl
-            }
+            // 选中紫色高亮；未选中 (所有 tab 统一) 用 nl 非高亮
+            val tint = if (selected) Color(0xFF7B6DFF) else coverColors.nl
             Column(
                 modifier = Modifier
                     .weight(1f)
