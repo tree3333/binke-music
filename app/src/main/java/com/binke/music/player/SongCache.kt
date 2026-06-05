@@ -290,7 +290,22 @@ class SongCache(private val apiService: KuwoApiService) {
             // 直接取 BinkeMusicApp 已通过 ImageLoaderFactory 配置好的单例
             val app = context.applicationContext as? com.binke.music.BinkeMusicApp
             imageLoader = app?.let {
-                coil.ImageLoader.Builder(it).build()
+                coil.ImageLoader.Builder(it)
+                    .memoryCache {
+                        coil.memory.MemoryCache.Builder(it)
+                            .maxSizePercent(0.25)
+                            .build()
+                    }
+                    .diskCache {
+                        coil.disk.DiskCache.Builder()
+                            .directory(it.cacheDir.resolve("image_cache"))
+                            .maxSizeBytes(0L)
+                            .build()
+                    }
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.DISABLED)
+                    .crossfade(true)
+                    .build()
             }
         }
 
