@@ -92,7 +92,9 @@ class MusicPlayer(private val context: Context) {
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                        // AUTO（自动播完切下一首）+ SEEK（锁屏/通知栏上一首/下一首按钮）都要处理
+                        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                            reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
                             player?.let { p ->
                                 if (p.mediaItemCount > 1) {
                                     val newIndex = p.currentMediaItemIndex

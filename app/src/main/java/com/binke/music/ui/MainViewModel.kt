@@ -234,8 +234,9 @@ class MainViewModel(
                 _currentIndex.value = newIndex
                 _currentSong.value = playlist[newIndex]
                 triggerCoverPrediction(playlist[newIndex].pic)
-                _currentPosition.value = 0L
-                _duration.value = 0L
+                _currentPosition.value = 1500L
+                // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
+                // 之间的几秒内 Slider 看到 duration=0 而 value=0 导致进度条回 0 抖动
                 _lyrics.value = emptyList()
                 preloadUpcoming()
                 // 重新加载当前歌曲的歌词
@@ -416,8 +417,10 @@ class MainViewModel(
     fun playSongAt(index: Int) {
         if (index !in _playlist.value.indices) return
         _currentIndex.value = index
-        // 同步当前索引到 ExoPlayer（供 MediaSession 上一首/下一首使用）
-        musicPlayer.setCurrentIndex(index)
+        // 注意：不要在这里调 musicPlayer.setCurrentIndex(index)，
+        // 那会触发 seekToDefaultPosition 立即切到新位置开始播，
+        // 然后 playSong 协程内的 setPlaylist 又会把 position 重置为 0，导致"播 1s 后从头再播"。
+        // setPlaylist 内部的 setMediaItems(..., snapshotIdx, 0) 已经把 ExoPlayer 切到正确位置。
         playSong(_playlist.value[index])
     }
 
@@ -449,8 +452,9 @@ class MainViewModel(
             _isLoading.value = true
             _playbackError.value = null
             _playbackDebugParams.value = null
-            _currentPosition.value = 0L
-            _duration.value = 0L
+            _currentPosition.value = 1500L
+            // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
+            // 之间的几秒内 Slider 看到 duration=0 而 value=0 导致进度条回 0 抖动
             _lyrics.value = emptyList()
 
             // 并发预取所有歌曲的 URL（用快照 playlist）
