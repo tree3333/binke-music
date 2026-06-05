@@ -1,5 +1,6 @@
 package com.binke.music.ui
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import com.binke.music.data.model.Song
 import com.binke.music.data.repository.MusicRepository
 import com.binke.music.player.MusicPlayer
 import com.binke.music.player.SongCache
+import com.binke.music.ui.theme.CoverColorPredictor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -25,14 +27,55 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class MainViewModel(
+    private val application: Application,
     private val apiService: KuwoApiService,
     private val repository: MusicRepository,
     private val musicPlayer: MusicPlayer
 ) : ViewModel() {
 
     private val songCache = SongCache.getInstance(apiService)
+
+    // 封面颜色预测器 (7 个 int8 TFLite ensemble, 3.73 MB)
+    private val colorPredictor: CoverColorPredictor by lazy { CoverColorPredictor(application) }
+    private val _coverColors = MutableStateFlow(CoverColorPredictor.ColorTriple(
+        bg = androidx.compose.ui.graphics.Color(0xFF121212),
+        pl = androidx.compose.ui.graphics.Color.White,
+        nl = androidx.compose.ui.graphics.Color(0xFF9A9A9F)
+    ))
+    val coverColors: StateFlow<CoverColorPredictor.ColorTriple> = _coverColors.asStateFlow()
+    private val httpClient: OkHttpClient by lazy { OkHttpClient() }
+    private var coverPredictionJob: Job? = null
+
+    /**
+     * 触发封面颜色预测。
+     * 取消上一次未完成的预测（防 race），下载封面 → 推理 → 更新 _coverColors。
+     * 失败用默认 fallback，不抛异常。
+     */
+    private fun triggerCoverPrediction(picUrl: String) {
+        if (picUrl.isBlank()) return
+        coverPredictionJob?.cancel()
+        coverPredictionJob = viewModelScope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) {
+                    httpClient.newCall(
+                        Request.Builder().url(picUrl).build()
+                    ).execute().use { resp ->
+                        if (!resp.isSuccessful) return@withContext null
+                        resp.body?.bytes()
+                    }
+                } ?: return@launch
+                val bmp = colorPredictor.decodeBitmap(bytes) ?: return@launch
+                val triple = colorPredictor.predict(bmp)
+                _coverColors.value = triple
+            } catch (e: Exception) {
+                // fallback: 保留当前 _coverColors (默认深灰白)
+            }
+        }
+    }
 
     private val _currentPage = MutableStateFlow(Page.HOME)
     val currentPage: StateFlow<Page> = _currentPage.asStateFlow()
@@ -190,6 +233,7 @@ class MainViewModel(
             if (newIndex in playlist.indices) {
                 _currentIndex.value = newIndex
                 _currentSong.value = playlist[newIndex]
+                triggerCoverPrediction(playlist[newIndex].pic)
                 _currentPosition.value = 0L
                 _duration.value = 0L
                 _lyrics.value = emptyList()
@@ -214,6 +258,7 @@ class MainViewModel(
             if (existingSong != null) {
                 _currentIndex.value = idx
                 _currentSong.value = existingSong
+                triggerCoverPrediction(existingSong.pic)
                 reloadLyricsForCurrentSong()
             }
         }
@@ -431,6 +476,7 @@ class MainViewModel(
                 snapshotSong
             }
             _currentSong.value = enhancedSong
+            triggerCoverPrediction(enhancedSong.pic)
             // 用快照 playlist 更新封面（同步进行，不影响 urlMapDeferred）
             val updatedList = snapshotPlaylist.toMutableList()
             val idxInSnapshot = updatedList.indexOfFirst { it.id == snapshotSong.id }
@@ -781,12 +827,13 @@ class MainViewModel(
 }
 
 class MainViewModelFactory(
+    private val application: android.app.Application,
     private val apiService: KuwoApiService,
     private val repository: MusicRepository,
     private val musicPlayer: MusicPlayer
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MainViewModel(apiService, repository, musicPlayer) as T
+        return MainViewModel(application, apiService, repository, musicPlayer) as T
     }
 }

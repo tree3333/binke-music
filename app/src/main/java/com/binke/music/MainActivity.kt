@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity(), MediaControllerCallback {
 
         val app = application as BinkeMusicApp
         SongCache.setAppContext(app)
-        val factory = MainViewModelFactory(app.apiService, app.musicRepository, app.musicPlayer)
+        val factory = MainViewModelFactory(app, app.apiService, app.musicRepository, app.musicPlayer)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
         startPlaybackService()
@@ -210,6 +210,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val playMode by viewModel.playMode.collectAsState()
     val lyrics by viewModel.lyrics.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val coverColors by viewModel.coverColors.collectAsState()
 
     val recommendPlaylists by viewModel.recommendPlaylists.collectAsState()
     val bangPlaylists by viewModel.bangPlaylists.collectAsState()
@@ -339,7 +340,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 TopBar(
                     currentTab = currentTab,
                     onTabSelected = { viewModel.setTab(it) },
-                    onSearchClick = { viewModel.navigateTo(Page.SEARCH) }
+                    onSearchClick = { viewModel.navigateTo(Page.SEARCH) },
+                    coverColors = coverColors
                 )
             }
 
@@ -388,7 +390,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onOpenQueue = { viewModel.openQueueSheet() },
                         onAddToPlaylist = { currentSong?.let { viewModel.showPlaylistPicker(it) } },
                         onSeek = { viewModel.seekTo(it) },
-                        onLyricSeekToLine = { viewModel.seekToLyricIndex(it) }
+                        onLyricSeekToLine = { viewModel.seekToLyricIndex(it) },
+                        coverColors = coverColors
                     )
 
                     currentPage == Page.MINE -> MineScreen(
@@ -423,7 +426,8 @@ fun MainScreen(viewModel: MainViewModel) {
             if (isPortrait) {
                 BottomNav(
                     currentTab = currentTab,
-                    onTabSelected = { viewModel.setTab(it) }
+                    onTabSelected = { viewModel.setTab(it) },
+                    coverColors = coverColors
                 )
             }
         }
