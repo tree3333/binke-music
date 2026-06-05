@@ -13,7 +13,6 @@ import com.binke.music.data.model.Song
 import com.binke.music.data.repository.MusicRepository
 import com.binke.music.player.MusicPlayer
 import com.binke.music.player.SongCache
-import android.support.v4.media.MediaMetadataCompat
 import com.binke.music.ui.theme.CoverColorPredictor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,11 +41,10 @@ class MainViewModel(
 
     // 封面颜色预测器 (7 个 int8 TFLite ensemble, 3.73 MB)
     private val colorPredictor: CoverColorPredictor by lazy { CoverColorPredictor(application) }
-    // ColorTriple.bg/pl/nl 改为 ARGB Int，去 Compose 化 (Android 4.4 兼容)
     private val _coverColors = MutableStateFlow(CoverColorPredictor.ColorTriple(
-        bg = 0xFF121212.toInt(),
-        pl = 0xFFFFFFFF.toInt(),
-        nl = 0xFF9A9A9F.toInt()
+        bg = androidx.compose.ui.graphics.Color(0xFF121212),
+        pl = androidx.compose.ui.graphics.Color.White,
+        nl = androidx.compose.ui.graphics.Color(0xFF9A9A9F)
     ))
     val coverColors: StateFlow<CoverColorPredictor.ColorTriple> = _coverColors.asStateFlow()
     private val httpClient: OkHttpClient by lazy { OkHttpClient() }
@@ -211,16 +209,10 @@ class MainViewModel(
         musicPlayer.onDurationChanged = { dur ->
             _duration.value = dur
         }
-        // ExoPlayer 2.x: Boolean isPlaying 来自 Player.Listener.onIsPlayingChanged
-        musicPlayer.onIsPlayingChanged = { playing ->
+        musicPlayer.onPlaybackStateChanged = { playing ->
             _isPlaying.value = playing
         }
-        // 完整的 PlaybackStateCompat 状态码（STATE_PLAYING/PAUSED/BUFFERING/STOPPED 等）
-        // 当前 UI 只用 isPlaying，这里记到独立 StateFlow 供后续可能的状态指示器使用
-        musicPlayer.onPlaybackStateChanged = { _ ->
-            // 暂未消费，留接口
-        }
-        musicPlayer.onPlayerError = { error ->
+        musicPlayer.onPlaybackError = { error ->
             _playbackError.value = error
             _playbackDebugParams.value = buildPlaybackParams(_currentSong.value?.playUrl)
         }
@@ -261,7 +253,7 @@ class MainViewModel(
         // APP 被系统杀掉后恢复时，同步当前播放状态（不依赖 onMediaItemTransition）
         val currentMediaItem = musicPlayer.getCurrentMediaItem()
         if (currentMediaItem != null) {
-            val mediaId = currentMediaItem.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID)
+            val mediaId = currentMediaItem.mediaId
             val idx = musicPlayer.getCurrentMediaItemIndex()
             val existingSong = _playlist.value.find { it.id == mediaId }
             if (existingSong != null) {
@@ -409,7 +401,12 @@ class MainViewModel(
         }
         _playMode.value = newMode
         // 同步 ExoPlayer repeat mode（修复单曲循环不生效）
-        musicPlayer.setPlayMode(newMode)
+        musicPlayer.setRepeatMode(
+            when (newMode) {
+                PlayMode.SINGLE_LOOP -> androidx.media3.common.Player.REPEAT_MODE_ONE
+                else -> androidx.media3.common.Player.REPEAT_MODE_OFF
+            }
+        )
     }
 
     fun seekTo(position: Long) {
@@ -494,13 +491,12 @@ class MainViewModel(
 
             // 等所有 URL 预取完毕，再设置播放列表（所有 MediaItem 都有真实 URL）
             val urlMap = urlMapDeferred.await()
-            // urlProvider 由 urlProvider lambda 从 SongCache 读取（已在 urlMap 写入后），
-            // setPlaylist 内部通过 urlProvider 解析每个 mediaId 的真实 URL。
-            // 注意：不再调用 musicPlayer.play(url) — setPlaylist 已自动 prepare + playWhenReady = true。
-            musicPlayer.setPlaylist(updatedList, snapshotIdx, 0L)
+            musicPlayer.setPlaylist(updatedList, urlMap, snapshotIdx)
+
             val playUrl = urlMap[updatedList.getOrNull(snapshotIdx)?.id]
             if (!playUrl.isNullOrBlank()) {
                 _playbackDebugParams.value = buildPlaybackParams(playUrl)
+                musicPlayer.play(playUrl)
                 _isPlaying.value = true
                 preloadUpcoming()
             } else {

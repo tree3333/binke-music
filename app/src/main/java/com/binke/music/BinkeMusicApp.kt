@@ -1,11 +1,9 @@
 package com.binke.music
 
 import android.app.Application
+import androidx.multidex.MultiDex
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import coil.disk.DiskCache
-import coil.memory.MemoryCache
-import coil.request.CachePolicy
 import com.binke.music.data.api.KuwoApiService
 import com.binke.music.data.repository.MusicRepository
 import com.binke.music.player.MusicPlayer
@@ -21,33 +19,20 @@ class BinkeMusicApp : Application(), ImageLoaderFactory {
     lateinit var musicPlayer: MusicPlayer
         private set
 
-    /** 全局共享 ImageLoader：只走内存缓存，不落磁盘，保证预加载命中 */
+    /** 全局共享 ImageLoader：Coil 1.4.0 API（API 19 兼容），用默认内存缓存 */
     override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
-            .memoryCache {
-                MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
-                    .build()
-            }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(0L)  // 禁用磁盘缓存
-                    .build()
-            }
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.DISABLED)
-            .crossfade(true)
-            .build()
+        return ImageLoader.Builder(this).build()
     }
 
     override fun onCreate() {
         super.onCreate()
+        // 批 1: API 19 需要手动 install MultiDex
+        MultiDex.install(this)
         try {
             apiService = KuwoApiService()
             musicRepository = MusicRepository(this)
-            musicPlayer = MusicPlayer(this)
-            musicPlayer.initialize()
+            // 批 2: musicPlayer 注入 (ExoPlayer 2.19.1 + MediaSessionCompat)
+            musicPlayer = MusicPlayer(this).also { it.initialize(this) }
         } catch (e: Throwable) {
             android.util.Log.e(TAG, "初始化失败", e)
         }

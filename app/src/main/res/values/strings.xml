@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">彬可音乐</string>
+    <string name="tab_home">推荐</string>
+    <string name="tab_music">音乐</string>
+    <string name="tab_mine">我的</string>
+    <string name="search_hint">搜索歌手、歌曲、专辑</string>
+    <string name="home_section_recommend">每日推荐</string>
+    <string name="home_section_bang">热门榜单</string>
+    <string name="home_empty">暂无内容</string>
+    <string name="home_loading">加载中…</string>
+    <string name="playlist_meta_total">%1$d首</string>
+    <string name="playlist_meta_listen">播放 %1$s</string>
+    <string name="playlist_meta_default">推荐歌单</string>
+
+    <!-- Mine tab -->
+    <string name="mine_title">我的</string>
+    <string name="mine_section_custom">我创建的歌单</string>
+    <string name="mine_section_favorites">我的收藏</string>
+    <string name="mine_section_history">播放历史</string>
+    <string name="mine_empty_custom">还没有创建歌单，点击 + 新建一个</string>
+    <string name="mine_empty_favorites">还没有收藏的歌曲</string>
+    <string name="mine_empty_history">还没有播放记录</string>
+    <string name="mine_add_playlist_desc">新建歌单</string>
+    <string name="song_cover_desc">歌曲封面</string>
+    <string name="playlist_cover_desc">歌单封面</string>
+    <string name="dialog_new_playlist_title">新建歌单</string>
+    <string name="dialog_new_playlist_hint">歌单名称</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_create">创建</string>
+
+    <!-- Search page -->
+    <string name="search_button">搜索</string>
+    <string name="search_back_desc">返回</string>
+    <string name="search_play_desc">播放</string>
+    <string name="search_empty_initial">输入关键词搜索歌曲</string>
+    <string name="search_empty_no_results">没有找到相关结果</string>
+    <string name="search_result_count">共 %1$d 条结果</string>
+</resources>
