@@ -109,6 +109,10 @@ dependencies {
     
     // 注: Android 平台自带 org.json，不需要单独引
 
+    // RecyclerView + SwipeRefreshLayout (Home 列表用)
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // TensorFlow Lite (批 1: 降到 2.8.0 支持 API 19)
     implementation("org.tensorflow:tensorflow-lite:2.8.0")
     

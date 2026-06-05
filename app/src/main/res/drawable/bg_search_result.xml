@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  搜索结果行的圆角深色背景
+  用于 item_search_result.xml 的 LinearLayout 背景
+  8dp 圆角，与 cover 圆角尺寸一致
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/surface" />
+    <corners android:radius="8dp" />
+</shape>

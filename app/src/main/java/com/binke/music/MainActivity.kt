@@ -10,11 +10,12 @@ import com.binke.music.databinding.ActivityMainBinding
 import com.binke.music.player.BinkeMediaCallbacks
 import com.binke.music.player.MediaControllerCallback
 import com.binke.music.player.PlaybackService
+import com.binke.music.ui.HomeFragment
+import com.binke.music.ui.MineFragment
 import com.binke.music.ui.MusicFragment
 
 /**
- * 批 1 简化 MainActivity - 验证 minSdk 19 APK 能装上
- * Batch 2 会接入完整 ViewModel + 4 Fragment 切换
+ * 批 3: 完整 MainActivity - BottomNav 切换 3 个 tab
  */
 class MainActivity : AppCompatActivity(), MediaControllerCallback {
 
@@ -25,16 +26,42 @@ class MainActivity : AppCompatActivity(), MediaControllerCallback {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 启动播放服务（API 19 没有 startForegroundService，用 startService）
         startPlaybackService()
         BinkeMediaCallbacks.callback = this
 
-        // 批 1: 占位 fragment
+        // 批 3: BottomNav 切换 Fragment
         if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(binding.fragmentContainer.id, MusicFragment())
-                .commit()
+            showFragment(TAG_MUSIC)
+            binding.bottomNav.selectedItemId = R.id.nav_music
         }
+        binding.bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { showFragment(TAG_HOME); true }
+                R.id.nav_music -> { showFragment(TAG_MUSIC); true }
+                R.id.nav_mine -> { showFragment(TAG_MINE); true }
+                else -> false
+            }
+        }
+    }
+
+    private fun showFragment(tag: String) {
+        val fm = supportFragmentManager
+        val current = fm.fragments.firstOrNull { it.isVisible }
+        val target = fm.findFragmentByTag(tag)
+        val tx = fm.beginTransaction()
+        if (current != null) tx.hide(current)
+        if (target == null) {
+            val newFragment = when (tag) {
+                TAG_HOME -> HomeFragment()
+                TAG_MUSIC -> MusicFragment()
+                TAG_MINE -> MineFragment()
+                else -> MusicFragment()
+            }
+            tx.add(binding.fragmentContainer.id, newFragment, tag)
+        } else {
+            tx.show(target)
+        }
+        tx.commit()
     }
 
     override fun onDestroy() {
@@ -42,17 +69,16 @@ class MainActivity : AppCompatActivity(), MediaControllerCallback {
         super.onDestroy()
     }
 
-    // MediaControllerCallback (占位实现，Batch 2 接 ViewModel)
-    override fun onMediaPlay() { /* TODO Batch 2 */ }
-    override fun onMediaPause() { /* TODO Batch 2 */ }
-    override fun onMediaNext() { /* TODO Batch 2 */ }
-    override fun onMediaPrevious() { /* TODO Batch 2 */ }
-    override fun onMediaStop() { /* TODO Batch 2 */ }
+    // MediaControllerCallback 占位
+    override fun onMediaPlay() {}
+    override fun onMediaPause() {}
+    override fun onMediaNext() {}
+    override fun onMediaPrevious() {}
+    override fun onMediaStop() {}
 
     private fun startPlaybackService() {
         val intent = Intent(this, PlaybackService::class.java)
         try {
-            // 批 2: 启动 MediaSessionCompat 后台服务（API 19 用 startService，无 startForegroundService）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
             } else {
@@ -65,5 +91,8 @@ class MainActivity : AppCompatActivity(), MediaControllerCallback {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val TAG_HOME = "home"
+        private const val TAG_MUSIC = "music"
+        private const val TAG_MINE = "mine"
     }
 }

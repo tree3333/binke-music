@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  搜索输入框的圆角深色背景 (#2A2A2A)
+  供 SearchFragment 顶部 SearchView 容器使用
+  8dp 圆角，与 item 圆角保持视觉一致
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF2A2A2A" />
+    <corners android:radius="8dp" />
+</shape>
