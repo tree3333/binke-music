@@ -225,12 +225,18 @@ class PlaybackService : Service() {
 
     private fun createPendingIntent(): PendingIntent {
         val intent = Intent(this, MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        // 批 4: API 23+ 用 FLAG_IMMUTABLE；19-22 用 FLAG_UPDATE_CURRENT（无 IMMUTABLE 标记）
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
         return PendingIntent.getActivity(
             this,
             0,
             intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            flags
         )
     }
 
