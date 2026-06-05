@@ -23,16 +23,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import com.binke.music.ui.theme.CoverColorPredictor
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import com.binke.music.ui.util.BASE_HEIGHT_DP
+import com.binke.music.ui.util.BASE_WIDTH_DP
+import com.binke.music.ui.util.sdp
+import com.binke.music.ui.util.xdp
+import com.binke.music.ui.util.ydp
 import androidx.compose.ui.unit.sp
-
-private const val BASE_WIDTH_DP = 1920f
-private const val BASE_HEIGHT_DP = 1080f
-
-private fun Int.xdp(sx: Float): Dp = (this * sx).dp
-private fun Int.ydp(sy: Float): Dp = (this * sy).dp
-private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 private data class NavItem(val label: String, val icon: ImageVector)
 

@@ -77,24 +77,7 @@ class PlaybackService : MediaSessionService() {
         // 事件不走 MediaSession.Callback，在这里手工处理
         if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
             val keyEvent = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
-            if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
-                val cb = BinkeMediaCallbacks.callback
-                if (cb != null) {
-                    when (keyEvent.keyCode) {
-                        KeyEvent.KEYCODE_MEDIA_PLAY,
-                        KeyEvent.KEYCODE_MEDIA_PAUSE,
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                        KeyEvent.KEYCODE_HEADSETHOOK -> cb.onMediaPlay()
-                        KeyEvent.KEYCODE_MEDIA_NEXT,
-                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> cb.onMediaNext()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                        KeyEvent.KEYCODE_MEDIA_REWIND -> cb.onMediaPrevious()
-                        KeyEvent.KEYCODE_MEDIA_STOP -> cb.onMediaStop()
-                    }
-                } else {
-                    Log.w(TAG, "MEDIA_BUTTON received but callback not registered (activity not running)")
-                }
-            }
+            if (keyEvent != null) handleMediaKey(keyEvent)
             // 不要在这里 startForeground，因为没有 notification。
             // 如果 MediaSession 已经建立，系统不会要求前台服务。
             // 如果未建立，让服务自然结束。
@@ -169,8 +152,7 @@ class PlaybackService : MediaSessionService() {
             controller: MediaSession.ControllerInfo,
             mediaButtonEvent: Intent
         ): Boolean {
-            val cb = BinkeMediaCallbacks.callback
-            if (cb == null) {
+            if (BinkeMediaCallbacks.callback == null) {
                 Log.w(TAG, "MediaButtonEvent but callback not registered, consuming")
                 return true  // 消费事件，不让汽水音乐接收到
             }
@@ -183,31 +165,49 @@ class PlaybackService : MediaSessionService() {
                 return true
             }
 
-            when (keyEvent.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY,
-                KeyEvent.KEYCODE_MEDIA_PAUSE,
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                KeyEvent.KEYCODE_HEADSETHOOK -> {
-                    cb.onMediaPlay()
-                }
-                KeyEvent.KEYCODE_MEDIA_NEXT,
-                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                    cb.onMediaNext()
-                }
-                KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                    cb.onMediaPrevious()
-                }
-                KeyEvent.KEYCODE_MEDIA_STOP -> {
-                    cb.onMediaStop()
-                }
-                else -> {
-                    Log.d(TAG, "Unhandled media button keyCode=${keyEvent.keyCode}")
-                    return false
-                }
-            }
+            // 委托给 handleMediaKey 执行实际的 callback 分发
+            return handleMediaKey(keyEvent)
+        }
+    }
 
-            return true  // 消费事件，阻止 ExoPlayer 和其他 App 处理
+    /**
+     * 把媒体按键分发到 BinkeMediaCallbacks。
+     * 返回值：
+     *   true  = 已处理（消费事件，阻止 ExoPlayer / 其他 App 响应）
+     *   false = 未识别 keyCode（不消费，让 ExoPlayer 处理）
+     *
+     * 同时被 onStartCommand（MEDIA_BUTTON intent 路径）和
+     * MediaButtonCallback.onMediaButtonEvent（MediaSession 路径）调用，
+     * 避免两处重复维护按键映射。
+     */
+    private fun handleMediaKey(keyEvent: KeyEvent): Boolean {
+        val cb = BinkeMediaCallbacks.callback
+        if (cb == null) {
+            Log.w(TAG, "MEDIA_BUTTON received but callback not registered (activity not running)")
+            return true
+        }
+        return when (keyEvent.keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_HEADSETHOOK -> {
+                cb.onMediaPlay(); true
+            }
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                cb.onMediaNext(); true
+            }
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                cb.onMediaPrevious(); true
+            }
+            KeyEvent.KEYCODE_MEDIA_STOP -> {
+                cb.onMediaStop(); true
+            }
+            else -> {
+                Log.d(TAG, "Unhandled media button keyCode=${keyEvent.keyCode}")
+                false
+            }
         }
     }
 
