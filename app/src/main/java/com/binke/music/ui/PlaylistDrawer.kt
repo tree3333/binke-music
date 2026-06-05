@@ -43,7 +43,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,14 +52,12 @@ import coil.compose.AsyncImage
 import com.binke.music.data.model.Playlist
 import com.binke.music.data.model.Song
 import com.binke.music.player.SongCache
+import com.binke.music.ui.util.BASE_HEIGHT_DP
+import com.binke.music.ui.util.BASE_WIDTH_DP
+import com.binke.music.ui.util.sdp
+import com.binke.music.ui.util.xdp
+import com.binke.music.ui.util.ydp
 import kotlin.math.roundToInt
-
-private const val BASE_WIDTH_DP = 1920f
-private const val BASE_HEIGHT_DP = 1080f
-
-private fun Int.xdp(sx: Float): Dp = (this * sx).dp
-private fun Int.ydp(sy: Float): Dp = (this * sy).dp
-private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @Composable
 fun PlaylistDrawer(

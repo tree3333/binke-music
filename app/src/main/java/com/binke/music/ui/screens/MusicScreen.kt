@@ -47,9 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,8 +61,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
@@ -75,16 +70,14 @@ import com.binke.music.data.model.LrcLine
 import com.binke.music.data.model.PlayMode
 import com.binke.music.data.model.Song
 import com.binke.music.ui.theme.CoverColorPredictor
+import com.binke.music.ui.util.BASE_HEIGHT_DP
+import com.binke.music.ui.util.BASE_WIDTH_DP
+import com.binke.music.ui.util.sdp
+import com.binke.music.ui.util.xdp
+import com.binke.music.ui.util.ydp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
-
-private const val BASE_WIDTH_DP = 1920f
-private const val BASE_HEIGHT_DP = 1080f
-
-private fun Int.xdp(sx: Float): Dp = (this * sx).dp
-private fun Int.ydp(sy: Float): Dp = (this * sy).dp
-private fun Int.sdp(su: Float): Dp = (this * su).dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -113,9 +106,6 @@ fun MusicScreen(
     val sy = cfg.screenHeightDp / BASE_HEIGHT_DP
     val su = (sx + sy) / 2f
     val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
-
-    var swipeOffset by remember { mutableFloatStateOf(0f) }
-    var isSwiping by remember { mutableStateOf(false) }
 
     if (isPortrait) {
         // 竖屏布局：封面/歌词可切换 + 控制区
@@ -161,11 +151,7 @@ fun MusicScreen(
             onSeek = onSeek,
             onLyricSeekToLine = onLyricSeekToLine,
             coverColors = coverColors,
-            sx = sx, sy = sy, su = su,
-            swipeOffset = swipeOffset,
-            isSwiping = isSwiping,
-            onSwipeOffsetChange = { swipeOffset = it },
-            onIsSwipingChange = { isSwiping = it }
+            sx = sx, sy = sy, su = su
         )
     }
 }
@@ -456,11 +442,7 @@ private fun LandscapeMusicScreen(
     onSeek: (Long) -> Unit,
     onLyricSeekToLine: (Int) -> Unit,
     coverColors: CoverColorPredictor.ColorTriple,
-    sx: Float, sy: Float, su: Float,
-    swipeOffset: Float,
-    isSwiping: Boolean,
-    onSwipeOffsetChange: (Float) -> Unit,
-    onIsSwipingChange: (Boolean) -> Unit
+    sx: Float, sy: Float, su: Float
 ) {
     Row(
         modifier = Modifier
@@ -476,24 +458,18 @@ private fun LandscapeMusicScreen(
                 .pointerInput(Unit) {
                     var accumulatedDrag = 0f
                     detectVerticalDragGestures(
-                        onDragStart = { onIsSwipingChange(true) },
                         onDragEnd = {
-                            onIsSwipingChange(false)
                             when {
                                 accumulatedDrag < -120 * sy -> onNext()
                                 accumulatedDrag > 120 * sy -> onPrevious()
                             }
                             accumulatedDrag = 0f
-                            onSwipeOffsetChange(0f)
                         },
                         onDragCancel = {
-                            onIsSwipingChange(false)
                             accumulatedDrag = 0f
-                            onSwipeOffsetChange(0f)
                         },
                         onVerticalDrag = { _, dragAmount ->
                             accumulatedDrag += dragAmount
-                            onSwipeOffsetChange(accumulatedDrag)
                         }
                     )
                 }
@@ -756,8 +732,7 @@ private fun LandscapeMusicScreen(
                 lyrics = lyrics,
                 currentPosition = currentPosition,
                 onLineClick = onLyricSeekToLine,
-                coverColors = coverColors,
-                isPortrait = false
+                coverColors = coverColors
             )
         }
     }
@@ -771,8 +746,7 @@ private fun LyricsView(
     lyrics: List<LrcLine>,
     currentPosition: Long,
     onLineClick: (Int) -> Unit,
-    coverColors: CoverColorPredictor.ColorTriple,
-    isPortrait: Boolean = true
+    coverColors: CoverColorPredictor.ColorTriple
 ) {
     val listState = rememberLazyListState()
     val currentSec = currentPosition / 1000f

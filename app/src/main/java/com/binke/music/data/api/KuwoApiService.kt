@@ -197,13 +197,6 @@ class KuwoApiService {
         private const val REFERER = "http://www.kuwo.cn/"
         private const val KUWO_UA = "kwplayerhd_ar_4.3.0.8_tianbao_T1A_qirui"
         private const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-
-        init {
-            val params = "user=0&android_id=0&prod=kwplayerhd_ar_4.3.0.8&corp=kuwo&vipver=4.3.0.8&source=kwplayerhd_ar_4.3.0.8_tianbao_T1A_qirui.apk&notrace=0&type=convert_url2&br=320&format=mp3&sig=0&rid=29530546&priority=bitrate&loginUid=0&network=WIFI&loginSid=0&mode=down"
-            val encrypted = kwDES.encrypt(params)
-            val decrypted = kwDES.decrypt(encrypted)
-            Log.d("KuwoApi", "kwDES decrypt roundtrip OK: ${params == decrypted}")
-        }
     }
 
     private val browserClient = OkHttpClient.Builder()
@@ -749,15 +742,5 @@ class KuwoApiService {
             }
         }
         return map
-    }
-
-    @Suppress("unused")
-    private fun decodeIfBroken(text: String): String {
-        return try {
-            val repaired = String(text.toByteArray(Charset.forName("ISO-8859-1")), Charsets.UTF_8)
-            if (repaired.contains('�')) text else repaired
-        } catch (_: Exception) {
-            text
-        }
     }
 }

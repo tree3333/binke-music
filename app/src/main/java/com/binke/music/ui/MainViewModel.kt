@@ -422,9 +422,7 @@ class MainViewModel(
     }
 
     fun playSong(song: Song) {
-        // Bug2 fix: 切歌时取消上一首的歌词加载协程，防止 race condition
-        lyricsJob?.cancel()
-
+        // 注意：歌词协程的 cancel 由 reloadLyricsForCurrentSong 内部处理，避免重复
         // 同步快照：playSong 启动时的完整播放上下文，防止后续调用覆盖 _playlist.value 后
         // 协程体内仍用旧快照（urlMapDeferred/currentIdx）但 setPlaylist 却用新列表
         val snapshotPlaylist: List<Song>
@@ -502,16 +500,9 @@ class MainViewModel(
                 _playbackError.value = "未获取到播放地址"
             }
 
-            // Bug2 fix: 歌词独立协程，且切歌时 job 被 cancel 就不再写回
-            lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-                val cachedLyrics = songCache.get(enhancedSong)?.lyrics
-                if (cachedLyrics != null) {
-                    if (isActive) _lyrics.value = cachedLyrics
-                } else {
-                    val lyrics = songCache.loadLyrics(enhancedSong)
-                    if (isActive) _lyrics.value = lyrics
-                }
-            }
+            // 重新加载当前歌曲的歌词（与 reloadLyricsForCurrentSong 复用）
+            // 此时 _currentSong.value 已是 enhancedSong，与 MediaSession 切歌路径行为一致
+            reloadLyricsForCurrentSong()
             _isLoading.value = false
         }
     }

@@ -59,7 +59,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -79,62 +78,17 @@ import com.binke.music.ui.MainViewModel
 import com.binke.music.ui.MainViewModelFactory
 import com.binke.music.ui.PlaylistDrawer
 import com.binke.music.ui.components.BottomNav
+import com.binke.music.ui.components.CompactDialog
 import com.binke.music.ui.components.TopBar
 import com.binke.music.ui.screens.HomeScreen
 import com.binke.music.ui.screens.MineScreen
 import com.binke.music.ui.screens.MusicScreen
 import com.binke.music.ui.screens.SearchScreen
-
-private const val BASE_WIDTH_DP = 1920f
-private const val BASE_HEIGHT_DP = 1080f
-
-private fun Int.xdp(sx: Float): Dp = (this * sx).dp
-private fun Int.ydp(sy: Float): Dp = (this * sy).dp
-private fun Int.sdp(su: Float): Dp = (this * su).dp
-
-@Composable
-private fun CompactDialog(
-    title: String,
-    onDismissRequest: () -> Unit,
-    sx: Float,
-    sy: Float,
-    su: Float,
-    confirmText: String,
-    onConfirm: () -> Unit,
-    dismissText: String = "取消",
-    onDismissClick: () -> Unit = onDismissRequest,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val cfg = LocalConfiguration.current
-    val isPortrait = cfg.screenHeightDp > cfg.screenWidthDp
-    Dialog(onDismissRequest = onDismissRequest) {
-        Surface(
-            modifier = Modifier.width(if (isPortrait) cfg.screenWidthDp.dp * 0.85f else 620.xdp(sx)),
-            shape = RoundedCornerShape(24.sdp(su)),
-            color = Color(0xFF1C1C1E)
-        ) {
-            Column(
-                modifier = Modifier.padding(36.sdp(su)),
-                verticalArrangement = Arrangement.spacedBy(20.ydp(sy))
-            ) {
-                Text(title, fontSize = (36 * su).sp, color = Color.White)
-                content()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismissClick) {
-                        Text(dismissText, fontSize = (28 * su).sp, color = Color(0xFF8E8E93))
-                    }
-                    TextButton(onClick = onConfirm) {
-                        Text(confirmText, fontSize = (28 * su).sp, color = Color(0xFF0A84FF))
-                    }
-                }
-            }
-        }
-    }
-}
+import com.binke.music.ui.util.BASE_HEIGHT_DP
+import com.binke.music.ui.util.BASE_WIDTH_DP
+import com.binke.music.ui.util.sdp
+import com.binke.music.ui.util.xdp
+import com.binke.music.ui.util.ydp
 
 class MainActivity : ComponentActivity(), MediaControllerCallback {
 
