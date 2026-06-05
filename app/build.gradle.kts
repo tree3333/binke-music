@@ -17,6 +17,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // 只打真机 ABI (arm64 + armv7)，去掉 x86/x86_64 模拟器用，APK -9.5MB
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
@@ -99,7 +104,6 @@ dependencies {
 
     // TensorFlow Lite (cover color prediction, 7 int8 models, 3.73MB total)
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
