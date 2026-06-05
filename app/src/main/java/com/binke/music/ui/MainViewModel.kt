@@ -234,8 +234,9 @@ class MainViewModel(
                 _currentIndex.value = newIndex
                 _currentSong.value = playlist[newIndex]
                 triggerCoverPrediction(playlist[newIndex].pic)
-                _currentPosition.value = 0L
-                _duration.value = 0L
+                _currentPosition.value = 1500L
+                // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
+                // 之间的几秒内 Slider 看到 duration=0 而 value=0 导致进度条回 0 抖动
                 _lyrics.value = emptyList()
                 preloadUpcoming()
                 // 重新加载当前歌曲的歌词
@@ -451,8 +452,9 @@ class MainViewModel(
             _isLoading.value = true
             _playbackError.value = null
             _playbackDebugParams.value = null
-            _currentPosition.value = 0L
-            _duration.value = 0L
+            _currentPosition.value = 1500L
+            // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
+            // 之间的几秒内 Slider 看到 duration=0 而 value=0 导致进度条回 0 抖动
             _lyrics.value = emptyList()
 
             // 并发预取所有歌曲的 URL（用快照 playlist）
