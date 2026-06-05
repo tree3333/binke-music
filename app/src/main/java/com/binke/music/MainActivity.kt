@@ -425,7 +425,8 @@ fun MainScreen(viewModel: MainViewModel) {
             if (isPortrait) {
                 BottomNav(
                     currentTab = currentTab,
-                    onTabSelected = { viewModel.setTab(it) }
+                    onTabSelected = { viewModel.setTab(it) },
+                    coverColors = coverColors
                 )
             }
         }

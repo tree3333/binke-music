@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import com.binke.music.ui.theme.CoverColorPredictor
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +45,8 @@ private val navItems = listOf(
 @Composable
 fun BottomNav(
     currentTab: Int,
-    onTabSelected: (Int) -> Unit
+    onTabSelected: (Int) -> Unit,
+    coverColors: CoverColorPredictor.ColorTriple
 ) {
     val cfg = LocalConfiguration.current
     val sx = cfg.screenWidthDp / BASE_WIDTH_DP
@@ -55,12 +57,14 @@ fun BottomNav(
         modifier = Modifier
             .fillMaxWidth()
             .height(140.ydp(sy))
-            .background(Color(0xFF161616)),
+            .background(coverColors.bg),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         navItems.forEachIndexed { index, item ->
-            val selected = currentTab == index
+            // "音乐" tab 用 pl (高亮), "推荐"/"我的" 用 nl (非高亮)
+            val isMusic = item.label == "音乐"
+            val tint = if (isMusic) coverColors.pl else coverColors.nl
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -72,12 +76,12 @@ fun BottomNav(
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
-                    tint = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
+                    tint = tint,
                     modifier = Modifier.size((80 * 0.8f).toInt().sdp(su))
                 )
                 Text(
                     text = item.label,
-                    color = if (selected) Color(0xFF7B6DFF) else Color(0xFF8E8E93),
+                    color = tint,
                     fontSize = (40 * su * 0.8f).sp
                 )
             }
