@@ -48,9 +48,13 @@ fun TopBar(
     val su = (sx + sy) / 2f
 
     val isMusic = currentTab == 1
-    // 音乐 tab：氛围背景 + 搜索框用 nl；其他 tab 保持原色
+    // 音乐 tab：氛围背景 + 搜索框用氛围色叠 30% 灰半透；其他 tab 保持原色
     val barBg = if (isMusic) coverColors.bg else Color(0xFF161616)
-    val searchBg = if (isMusic) coverColors.nl else Color(0xFF26262B)
+    val searchBg = if (isMusic) coverColors.bg else Color(0xFF26262B)
+    val searchOverlay = if (isMusic) Color(0x4D808080) else null
+    // 音乐 tab 时：选中=pl (高亮), 未选中=nl；其他 tab 时：恢复原色
+    val selectedColor = if (isMusic) coverColors.pl else Color.White
+    val unselectedColor = if (isMusic) coverColors.nl else Color(0xFF7B7B80)
 
     Row(
         modifier = Modifier
@@ -66,11 +70,11 @@ fun TopBar(
                 .offset(x = 209.xdp(sx)),
             horizontalArrangement = Arrangement.Center
         ) {
-            TabItem("推荐", currentTab == 0, su = su) { onTabSelected(0) }
+            TabItem("推荐", currentTab == 0, su = su, selectedColor = selectedColor, unselectedColor = unselectedColor) { onTabSelected(0) }
             Spacer(modifier = Modifier.width(42.xdp(sx)))
-            TabItem("音乐", currentTab == 1, su = su) { onTabSelected(1) }
+            TabItem("音乐", currentTab == 1, su = su, selectedColor = selectedColor, unselectedColor = unselectedColor) { onTabSelected(1) }
             Spacer(modifier = Modifier.width(42.xdp(sx)))
-            TabItem("我的", currentTab == 2, su = su) { onTabSelected(2) }
+            TabItem("我的", currentTab == 2, su = su, selectedColor = selectedColor, unselectedColor = unselectedColor) { onTabSelected(2) }
         }
 
         Box(
@@ -81,6 +85,14 @@ fun TopBar(
                 .clickable(onClick = onSearchClick),
             contentAlignment = Alignment.CenterStart
         ) {
+            if (searchOverlay != null) {
+                // 氛围背景上叠 30% 灰度半透明
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(searchOverlay, RoundedCornerShape(30.sdp(su)))
+                )
+            }
             Row(
                 modifier = Modifier.padding(horizontal = 24.xdp(sx)),
                 verticalAlignment = Alignment.CenterVertically
@@ -103,10 +115,17 @@ fun TopBar(
 }
 
 @Composable
-private fun TabItem(text: String, selected: Boolean, su: Float, onClick: () -> Unit) {
+private fun TabItem(
+    text: String,
+    selected: Boolean,
+    su: Float,
+    selectedColor: Color,
+    unselectedColor: Color,
+    onClick: () -> Unit
+) {
     Text(
         text = text,
-        color = if (selected) Color.White else Color(0xFF7B7B80),
+        color = if (selected) selectedColor else unselectedColor,
         fontSize = if (selected) (60 * su).sp else (48 * su).sp,
         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         modifier = Modifier.clickable(onClick = onClick)
