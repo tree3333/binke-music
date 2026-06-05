@@ -416,8 +416,10 @@ class MainViewModel(
     fun playSongAt(index: Int) {
         if (index !in _playlist.value.indices) return
         _currentIndex.value = index
-        // 同步当前索引到 ExoPlayer（供 MediaSession 上一首/下一首使用）
-        musicPlayer.setCurrentIndex(index)
+        // 注意：不要在这里调 musicPlayer.setCurrentIndex(index)，
+        // 那会触发 seekToDefaultPosition 立即切到新位置开始播，
+        // 然后 playSong 协程内的 setPlaylist 又会把 position 重置为 0，导致"播 1s 后从头再播"。
+        // setPlaylist 内部的 setMediaItems(..., snapshotIdx, 0) 已经把 ExoPlayer 切到正确位置。
         playSong(_playlist.value[index])
     }
 
