@@ -64,8 +64,12 @@ fun BottomNav(
     ) {
         navItems.forEachIndexed { index, item ->
             val selected = currentTab == index
-            // 选中紫色高亮；未选中 (所有 tab 统一) 用 nl 非高亮
-            val tint = if (selected) Color(0xFF7B6DFF) else coverColors.nl
+            // 选中紫色高亮；未选中: 音乐 tab 跟封面协调 (coverColors.nl)，其他 tab 用中性 0x80FFFFFF
+            val tint = when {
+                selected -> Color(0xFF7B6DFF)
+                currentTab == 1 -> coverColors.nl
+                else -> Color(0x80FFFFFF)
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
