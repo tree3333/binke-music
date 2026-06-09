@@ -190,15 +190,23 @@ class SongCache(private val apiService: KuwoApiService) {
         }
     }
 
+    /** 待 preloadPics 启动的所有协程 Job，用于 awaitPendingBitmaps 之前 join，确保 await 内的 containsKey 不会全 miss */
+    private val pendingPicJobs = java.util.concurrent.CopyOnWriteArrayList<kotlinx.coroutines.Job>()
+
     /**
      * 预加载封面图片（后台，等待图片真正下载并解码成 Bitmap 后再返回）。
-     * 1. 检查 preloadedCoverUrls 是否已有该 URL → 命中 "封面命中缓存"
+     * 1. 检查 cachedBitmaps 是否已有该 song.id → 命中 "封面命中缓存"
      * 2. 用 withContext(Dispatchers.IO) 真正等待 execute() 完成
      * 3. 用 BitmapFactory 解码 bytes 得到 Bitmap，存入 cachedBitmaps
      * 4. URL 加入 preloadedCoverUrls（与 playUrl/lyrics 共用同一滑动窗口）
      *
      * 注意：pendingHits.add("封面命中缓存") 移到 Bitmap 真正就绪之后，
      * 确保 toast 触发时图片已可直接渲染，不会回到 AsyncImage 重新 decode。
+     *
+     * 【双层加载修复】每次 scope.launch 都把 Job 记到 pendingPicJobs，awaitPendingBitmaps
+     * 调用前会 join 所有 pending job，确保 await 内的 containsKey 检查不会全 miss（之前
+     * scope.launch 异步写 vs await viewModelScope.launch 同步检查存在 race，5/6 首 containsKey
+     * 全 false → 重复 loader.execute 6 张，浪费 5 张下载）。
      */
     fun preloadPics(songs: List<Song>) {
         log("preloadPics 收到 ${songs.size} 首: ${songs.map { it.name }.take(6)}")
@@ -212,7 +220,7 @@ class SongCache(private val apiService: KuwoApiService) {
                 return@forEach
             }
             // 未命中：启动协程真正下载并解码
-            scope.launch {
+            val job = scope.launch {
                 withContext(Dispatchers.IO) {
                     try {
                         val loader = getImageLoader() ?: run {
@@ -224,23 +232,39 @@ class SongCache(private val apiService: KuwoApiService) {
                             .data(picUrl)
                             .build()
                         val result = loader.execute(request)
-                        val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)
-                            ?.bitmap
-                            ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                        val srcBitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                        // 【OOM 兜底】500x500 ARGB_8888 ≈ 1MB 理论不会 OOM，但某些 Android 机型
+                        // system bitmap pool 紧张时 .copy() 会抛 OutOfMemoryError。失败时回退用
+                        // Coil 缓存中的 src（不 copy），Coil memoryCache 默认 25% 应用内存，
+                        // 8 张 ≈ 8MB 远小于上限，不会被 LRU 淘汰。
+                        val bitmap: Bitmap? = srcBitmap?.let { src ->
+                            try {
+                                src.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                            } catch (oom: OutOfMemoryError) {
+                                warn("  ⚠ ${song.name} bitmap.copy OOM，回退用 src（不 copy）")
+                                src
+                            } catch (e: Throwable) {
+                                warn("  ⚠ ${song.name} bitmap.copy 异常: ${e.message}，回退用 src")
+                                src
+                            }
+                        }
                         if (bitmap != null) {
                             cachedBitmaps[song.id] = bitmap
                             log("  ✓ 封面就绪: ${song.name} (${bitmap.width}x${bitmap.height}, ${bitmap.byteCount/1024}KB)")
                             // Bitmap 就绪后才标记命中，确保 toast 触发时图片已可直接渲染
                             pendingHits.add("封面命中缓存")
                         } else {
-                            warn("  ✗ ${song.name} decode 失败 (drawable=${result.drawable!!::class.simpleName})")
+                            warn("  ✗ ${song.name} bitmap 为 null (drawable=${result.drawable!!::class.simpleName}, picUrl=$picUrl)")
                         }
                     } catch (e: Exception) {
                         warn("  ✗ ${song.name} 下载失败: ${e.message}")
                         // 下载失败，静默忽略，不影响播放
+                    } finally {
+                        pendingPicJobs.remove(coroutineContext[kotlinx.coroutines.Job])
                     }
                 }
             }
+            pendingPicJobs.add(job)
         }
     }
 
@@ -252,6 +276,18 @@ class SongCache(private val apiService: KuwoApiService) {
     suspend fun awaitPendingBitmaps(songs: List<Song>): Map<String, Bitmap> {
         val ctx = getAppContext() ?: return emptyMap()
         val results = mutableMapOf<String, Bitmap>()
+
+        // 【双层加载修复】先把 preloadPics 启动的所有 scope.launch 协程 join 掉。
+        // 之前 race：scope.launch 异步写 cachedBitmaps（230ms 内完成） vs await 内同步
+        // containsKey 检查（0ms）→ 5/6 首 containsKey 全 false → 重复 loader.execute 6 张。
+        // join 后 await 内的 containsKey 检查是 100% 命中状态，0 张重复加载。
+        if (pendingPicJobs.isNotEmpty()) {
+            val jobsToJoin = pendingPicJobs.toList()
+            log("awaitPendingBitmaps 等待 ${jobsToJoin.size} 个 preloadPics 协程完成")
+            jobsToJoin.forEach { it.join() }
+            log("awaitPendingBitmaps preloadPics 协程全部完成，进入命中检查")
+        }
+
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
@@ -264,15 +300,28 @@ class SongCache(private val apiService: KuwoApiService) {
                 val loader = getImageLoader() ?: return@forEach
                 val request = ImageRequest.Builder(ctx).data(picUrl).build()
                 val result = loader.execute(request)
-                val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)
-                    ?.bitmap
-                    ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                val srcBitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                // 【OOM 兜底】同 preloadPics 的处理：bitmap.copy 失败时回退用 src
+                val bitmap: Bitmap? = srcBitmap?.let { src ->
+                    try {
+                        src.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    } catch (oom: OutOfMemoryError) {
+                        warn("  ⚠ ${song.name} await bitmap.copy OOM，回退用 src")
+                        src
+                    } catch (e: Throwable) {
+                        warn("  ⚠ ${song.name} await bitmap.copy 异常: ${e.message}，回退用 src")
+                        src
+                    }
+                }
                 if (bitmap != null) {
                     cachedBitmaps[song.id] = bitmap
                     results[song.id] = bitmap
                     pendingHits.add("封面命中缓存")
+                } else {
+                    warn("  ✗ ${song.name} await bitmap 为 null (drawable=${result.drawable!!::class.simpleName})")
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                warn("  ✗ ${song.name} await 加载失败: ${e.message}")
                 // 同步加载失败，静默忽略
             }
         }
