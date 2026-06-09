@@ -221,47 +221,52 @@ class SongCache(private val apiService: KuwoApiService) {
             }
             // 未命中：启动协程真正下载并解码
             val job = scope.launch {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val loader = getImageLoader() ?: run {
-                            warn("  ✗ ${song.name} ImageLoader 为空（setAppContext 未调用?）")
-                            return@withContext
-                        }
-                        val ctx = getAppContext() ?: return@withContext
-                        val request = ImageRequest.Builder(ctx)
-                            .data(picUrl)
-                            .build()
-                        val result = loader.execute(request)
-                        val srcBitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                        // 【OOM 兜底】500x500 ARGB_8888 ≈ 1MB 理论不会 OOM，但某些 Android 机型
-                        // system bitmap pool 紧张时 .copy() 会抛 OutOfMemoryError。失败时回退用
-                        // Coil 缓存中的 src（不 copy），Coil memoryCache 默认 25% 应用内存，
-                        // 8 张 ≈ 8MB 远小于上限，不会被 LRU 淘汰。
-                        val bitmap: Bitmap? = srcBitmap?.let { src ->
-                            try {
-                                src.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                            } catch (oom: OutOfMemoryError) {
-                                warn("  ⚠ ${song.name} bitmap.copy OOM，回退用 src（不 copy）")
-                                src
-                            } catch (e: Throwable) {
-                                warn("  ⚠ ${song.name} bitmap.copy 异常: ${e.message}，回退用 src")
-                                src
+                try {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val loader = getImageLoader() ?: run {
+                                warn("  ✗ ${song.name} ImageLoader 为空（setAppContext 未调用?）")
+                                return@withContext
                             }
+                            val ctx = getAppContext() ?: return@withContext
+                            val request = ImageRequest.Builder(ctx)
+                                .data(picUrl)
+                                .build()
+                            val result = loader.execute(request)
+                            val srcBitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                            // 【OOM 兜底】500x500 ARGB_8888 ≈ 1MB 理论不会 OOM，但某些 Android 机型
+                            // system bitmap pool 紧张时 .copy() 会抛 OutOfMemoryError。失败时回退用
+                            // Coil 缓存中的 src（不 copy），Coil memoryCache 默认 25% 应用内存，
+                            // 8 张 ≈ 8MB 远小于上限，不会被 LRU 淘汰。
+                            val bitmap: Bitmap? = srcBitmap?.let { src ->
+                                try {
+                                    src.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                } catch (oom: OutOfMemoryError) {
+                                    warn("  ⚠ ${song.name} bitmap.copy OOM，回退用 src（不 copy）")
+                                    src
+                                } catch (e: Throwable) {
+                                    warn("  ⚠ ${song.name} bitmap.copy 异常: ${e.message}，回退用 src")
+                                    src
+                                }
+                            }
+                            if (bitmap != null) {
+                                cachedBitmaps[song.id] = bitmap
+                                log("  ✓ 封面就绪: ${song.name} (${bitmap.width}x${bitmap.height}, ${bitmap.byteCount/1024}KB)")
+                                // Bitmap 就绪后才标记命中，确保 toast 触发时图片已可直接渲染
+                                pendingHits.add("封面命中缓存")
+                            } else {
+                                warn("  ✗ ${song.name} bitmap 为 null (drawable=${result.drawable!!::class.simpleName}, picUrl=$picUrl)")
+                            }
+                        } catch (e: Exception) {
+                            warn("  ✗ ${song.name} 下载失败: ${e.message}")
+                            // 下载失败，静默忽略，不影响播放
                         }
-                        if (bitmap != null) {
-                            cachedBitmaps[song.id] = bitmap
-                            log("  ✓ 封面就绪: ${song.name} (${bitmap.width}x${bitmap.height}, ${bitmap.byteCount/1024}KB)")
-                            // Bitmap 就绪后才标记命中，确保 toast 触发时图片已可直接渲染
-                            pendingHits.add("封面命中缓存")
-                        } else {
-                            warn("  ✗ ${song.name} bitmap 为 null (drawable=${result.drawable!!::class.simpleName}, picUrl=$picUrl)")
-                        }
-                    } catch (e: Exception) {
-                        warn("  ✗ ${song.name} 下载失败: ${e.message}")
-                        // 下载失败，静默忽略，不影响播放
-                    } finally {
-                        pendingPicJobs.remove(coroutineContext[kotlinx.coroutines.Job])
                     }
+                } finally {
+                    // 关键：这里 coroutineContext[Job] 是 scope.launch 的外层 Job（不是 withContext 的子 Job），
+                    // remove 才能从 pendingPicJobs 中删掉。否则累加不减少，log 显示"等待 N 个"一直增加
+                    // （join 仍然立即返回因为协程早已完成，但 cosmetic 上难看）。
+                    pendingPicJobs.remove(coroutineContext[kotlinx.coroutines.Job])
                 }
             }
             pendingPicJobs.add(job)
