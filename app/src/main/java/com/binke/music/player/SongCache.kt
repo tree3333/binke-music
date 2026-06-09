@@ -40,7 +40,10 @@ class SongCache(private val apiService: KuwoApiService) {
     // 【核心命中判断】hasCover 直接看 cachedBitmaps.containsKey(song.id)，不用 preloadedCoverUrls 这套 URL 集合
     // —— 之前用 pic URL 集合做命中判断有 bug：evict 时 cache[id].pic 是原 URL，preloadedCoverUrls 是 enhanced URL，
     // 永远匹配不上 → 每次切歌 preloadedCoverUrls 全被清空 → preloadPics 永远不命中。
-    private val cachedBitmaps = mutableMapOf<String, Bitmap>()
+    // 【并发安全】必须用 ConcurrentHashMap：preloadPics（scope.launch 异步并发写）+ awaitPendingBitmaps
+    // （viewModelScope.launch 串行读/写）+ evictOutsideWindow（cache + cachedBitmaps + preloadedCoverUrls remove）
+    // 三方在不同协程上并发操作同一个 map。LinkedHashMap 写丢 key 必然 → 命中判断永远 false → 切歌每首重新下载。
+    private val cachedBitmaps: java.util.concurrent.ConcurrentHashMap<String, Bitmap> = java.util.concurrent.ConcurrentHashMap()
 
     // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空（已禁用）
     private val pendingHits = mutableListOf<String>()
