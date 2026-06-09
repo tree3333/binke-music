@@ -160,6 +160,7 @@ class SongCache(private val apiService: KuwoApiService) {
         evictFromBitmaps.forEach { cachedBitmaps.remove(it) }
         val evictFromCache = cache.keys.toList().filter { it !in windowIds }
         evictFromCache.forEach { cache.remove(it) }
+    }
 
     /**
      * 预加载多首歌曲的播放地址（后台，不阻塞）。
