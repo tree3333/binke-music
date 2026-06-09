@@ -1,6 +1,7 @@
 package com.binke.music.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -499,6 +500,32 @@ class MainViewModel(
                 musicPlayer.play(playUrl)
                 _isPlaying.value = true
                 preloadUpcoming()
+
+                // 关键修复：异步 await 接下来 6 首的 cover 真正就绪（不阻塞当前播放）。
+                // 切下一首时 cover 必然已写入 Coil memoryCache，AsyncImage 直接命中，零等待。
+                val upcomingForAwait = buildList {
+                    val size = updatedList.size
+                    for (offset in 1..6) {
+                        if (size > 1) {
+                            add(updatedList[(snapshotIdx + offset) % size])
+                        } else {
+                            updatedList.getOrNull(snapshotIdx + offset)?.let { add(it) }
+                        }
+                    }
+                }
+                viewModelScope.launch(Dispatchers.IO) {
+                    val t0 = System.currentTimeMillis()
+                    if (SongCache.getAppContext() == null) return@launch
+                    val results = songCache.awaitPendingBitmaps(upcomingForAwait)
+                    val msg = "✓ 后续 ${upcomingForAwait.size} 首 cover await 完成: 就绪 ${results.size} 张 (${System.currentTimeMillis() - t0}ms)"
+                    Log.d("MainViewModel", msg)
+                    SongCache.getLogFile()?.let { f ->
+                        try {
+                            val ts = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.CHINA).format(java.util.Date())
+                            f.appendText("[$ts] [MainViewModel] $msg\n")
+                        } catch (_: Exception) {}
+                    }
+                }
             } else {
                 _playbackDebugParams.value = buildPlaybackParams(null)
                 _playbackError.value = "未获取到播放地址"
@@ -512,7 +539,7 @@ class MainViewModel(
     }
 
     /**
-     * 预加载接下来最多 3 首的播放地址和歌词。
+     * 预加载接下来最多 6 首的播放地址、歌词和封面图片。
      * 首次播放时调用以填充缓存；切歌时只追加新增的条目。
      */
     private fun preloadUpcoming() {
@@ -520,7 +547,7 @@ class MainViewModel(
         val currentIdx = _currentIndex.value
         if (playlist.isEmpty()) return
 
-        // 滑动窗口清理：只保留 [currentIdx, currentIdx + 3]，移除已播放的条目
+        // 滑动窗口清理：只保留 [currentIdx, currentIdx + 6]，移除已播放的条目
         songCache.evictOutsideWindow(playlist, currentIdx)
 
         val upcoming = mutableListOf<Song>()
@@ -533,10 +560,10 @@ class MainViewModel(
             }
             PlayMode.SHUFFLE -> {
                 // 随机模式不知道具体下一首，随机取未缓存的 3 首
-                upcoming.addAll(playlist.filter { songCache.get(it) == null }.take(3))
+                upcoming.addAll(playlist.filter { songCache.get(it) == null }.take(6))
             }
             PlayMode.LIST_LOOP -> {
-                for (offset in 1..3) {
+                for (offset in 1..6) {
                     val idx = (currentIdx + offset) % size
                     val song = playlist[idx]
                     if (songCache.get(song) == null) {

@@ -2,8 +2,8 @@ package com.binke.music.player
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import coil.ImageLoader
-import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.binke.music.data.api.KuwoApiService
 import com.binke.music.data.model.LrcLine
@@ -14,6 +14,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 歌曲预加载缓存：播放地址 + 封面图片 + 歌词。
@@ -33,10 +37,10 @@ class SongCache(private val apiService: KuwoApiService) {
     private val cache = mutableMapOf<String, Entry>()
 
     // 封面 Bitmap 独立缓存（与 cache.Entry.coverBitmap 同步），直接存 Bitmap 供 Compose Image() 使用
+    // 【核心命中判断】hasCover 直接看 cachedBitmaps.containsKey(song.id)，不用 preloadedCoverUrls 这套 URL 集合
+    // —— 之前用 pic URL 集合做命中判断有 bug：evict 时 cache[id].pic 是原 URL，preloadedCoverUrls 是 enhanced URL，
+    // 永远匹配不上 → 每次切歌 preloadedCoverUrls 全被清空 → preloadPics 永远不命中。
     private val cachedBitmaps = mutableMapOf<String, Bitmap>()
-
-    // 记录已预加载封面的 URL 集合（用于统一判断命中）
-    private val preloadedCoverUrls = mutableSetOf<String>()
 
     // 待展示的缓存命中消息，playSong 时打包成一条 toast 后清空（已禁用）
     private val pendingHits = mutableListOf<String>()
@@ -52,9 +56,8 @@ class SongCache(private val apiService: KuwoApiService) {
     fun hasPlayUrl(song: Song): Boolean =
         cache[song.id]?.playUrl != null
 
-    /** 封面是否已预加载进内存（统一判断：URL 在 preloadedCoverUrls 中） */
-    fun hasCover(song: Song): Boolean =
-        song.pic?.isNotBlank() == true && song.pic in preloadedCoverUrls
+    /** 封面是否已预加载进内存（按 song.id 命中 cachedBitmaps，绕开原/增强 pic URL 不一致的 bug） */
+    fun hasCover(song: Song): Boolean = cachedBitmaps.containsKey(song.id)
 
     /** 获取已预加载的封面 Bitmap（供 Compose Image() 直接使用） */
     fun getCoverBitmap(songId: String): Bitmap? = cachedBitmaps[songId]
@@ -141,25 +144,22 @@ class SongCache(private val apiService: KuwoApiService) {
      * 在预加载前调用，确保缓存队列深度始终为 windowSize。
      * 同步清理 cache + cachedBitmaps + preloadedCoverUrls 三层缓存。
      */
-    fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = 3) {
+    fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = 7) {
+        // windowSize = 7: 窗口 [currentIdx, currentIdx+7) 共 7 个位置
+        // → 覆盖"当前播放" + "接下来 6 首 preload"（currentIdx+1~currentIdx+6）
+        // → 之前 windowSize=6 时 currentIdx+6 那一首在窗口外，被 evict 误删 → 切到那首时 cachedBitmaps 空 → 重新下载
         if (playlist.isEmpty()) return
-        val windowIds = (currentIdx until minOf(currentIdx + windowSize, playlist.size))
+        val windowEnd = minOf(currentIdx + windowSize, playlist.size)
+        val windowIds = (currentIdx until windowEnd)
             .mapNotNull { idx -> playlist.getOrNull(idx)?.id }
             .toSet()
-        // 清理 cache
-        cache.keys.toList().forEach { id ->
-            if (id !in windowIds) cache.remove(id)
+        val evictFromBitmaps = cachedBitmaps.keys.toList().filter { it !in windowIds }
+        if (evictFromBitmaps.isNotEmpty()) {
+            log("  evict 删 ${evictFromBitmaps.size} 张: ${evictFromBitmaps.joinToString { id -> playlist.indexOfFirst { it.id == id }.toString() }}")
         }
-        // 清理 Bitmap 缓存
-        cachedBitmaps.keys.toList().forEach { id ->
-            if (id !in windowIds) {
-                cachedBitmaps.remove(id)
-            }
-        }
-        // 清理预加载记录（按 pic URL 清理，只删窗口内不存在的）
-        val windowPics = windowIds.mapNotNull { id -> cache[id]?.pic }.toSet()
-        preloadedCoverUrls.removeAll { pic -> pic !in windowPics }
-    }
+        evictFromBitmaps.forEach { cachedBitmaps.remove(it) }
+        val evictFromCache = cache.keys.toList().filter { it !in windowIds }
+        evictFromCache.forEach { cache.remove(it) }
 
     /**
      * 预加载多首歌曲的播放地址（后台，不阻塞）。
@@ -197,11 +197,13 @@ class SongCache(private val apiService: KuwoApiService) {
      * 确保 toast 触发时图片已可直接渲染，不会回到 AsyncImage 重新 decode。
      */
     fun preloadPics(songs: List<Song>) {
+        log("preloadPics 收到 ${songs.size} 首: ${songs.map { it.name }.take(6)}")
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
-            // 命中判断：URL 已在预加载集合中
-            if (picUrl in preloadedCoverUrls) {
+            // 命中判断：按 song.id 看 cachedBitmaps（之前用 pic URL set 有 bug，已废弃）
+            if (cachedBitmaps.containsKey(song.id)) {
+                log("  ✓ 命中已预加载: ${song.name} (cached=${cachedBitmaps[song.id]?.let { "${it.width}x${it.height}" } ?: "无Bitmap"})")
                 pendingHits.add("封面命中缓存")
                 return@forEach
             }
@@ -209,7 +211,10 @@ class SongCache(private val apiService: KuwoApiService) {
             scope.launch {
                 withContext(Dispatchers.IO) {
                     try {
-                        val loader = getImageLoader() ?: return@withContext
+                        val loader = getImageLoader() ?: run {
+                            warn("  ✗ ${song.name} ImageLoader 为空（setAppContext 未调用?）")
+                            return@withContext
+                        }
                         val ctx = getAppContext() ?: return@withContext
                         val request = ImageRequest.Builder(ctx)
                             .data(picUrl)
@@ -220,11 +225,14 @@ class SongCache(private val apiService: KuwoApiService) {
                             ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                         if (bitmap != null) {
                             cachedBitmaps[song.id] = bitmap
-                            preloadedCoverUrls.add(picUrl)
+                            log("  ✓ 封面就绪: ${song.name} (${bitmap.width}x${bitmap.height}, ${bitmap.byteCount/1024}KB)")
                             // Bitmap 就绪后才标记命中，确保 toast 触发时图片已可直接渲染
                             pendingHits.add("封面命中缓存")
+                        } else {
+                            warn("  ✗ ${song.name} decode 失败 (drawable=${result.drawable!!::class.simpleName})")
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        warn("  ✗ ${song.name} 下载失败: ${e.message}")
                         // 下载失败，静默忽略，不影响播放
                     }
                 }
@@ -243,7 +251,8 @@ class SongCache(private val apiService: KuwoApiService) {
         songs.forEach { song ->
             val picUrl = song.pic
             if (picUrl.isNullOrBlank()) return@forEach
-            if (picUrl in preloadedCoverUrls) {
+            // 命中判断：按 song.id 看 cachedBitmaps（与 preloadPics 保持一致）
+            if (cachedBitmaps.containsKey(song.id)) {
                 cachedBitmaps[song.id]?.let { results[song.id] = it }
                 return@forEach
             }
@@ -256,7 +265,6 @@ class SongCache(private val apiService: KuwoApiService) {
                     ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                 if (bitmap != null) {
                     cachedBitmaps[song.id] = bitmap
-                    preloadedCoverUrls.add(picUrl)
                     results[song.id] = bitmap
                     pendingHits.add("封面命中缓存")
                 }
@@ -268,6 +276,8 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     companion object {
+        private const val TAG = "SongCache"
+
         @Volatile
         private var instance: SongCache? = null
 
@@ -275,6 +285,29 @@ class SongCache(private val apiService: KuwoApiService) {
 
         /** 指向 BinkeMusicApp 单例，与 AsyncImage 共用同一 ImageLoader，保证缓存命中 */
         private var imageLoader: ImageLoader? = null
+
+        /** 日志文件：/Android/data/com.binke.music/files/logs/binke_preload.log（user 无 adb 时直接用文件管理器看） */
+        private var logFile: File? = null
+        private val tsFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.CHINA)
+
+        /** 统一日志：logcat + 文件（无 adb 时查看文件路径下方有说明） */
+        fun log(msg: String) {
+            Log.d(TAG, msg)
+            val f = logFile ?: return
+            try {
+                val ts = tsFormat.format(Date())
+                f.appendText("[$ts] $msg\n")
+            } catch (_: Exception) {}
+        }
+
+        fun warn(msg: String) {
+            Log.w(TAG, msg)
+            val f = logFile ?: return
+            try {
+                val ts = tsFormat.format(Date())
+                f.appendText("[$ts] WARN: $msg\n")
+            } catch (_: Exception) {}
+        }
 
         fun getInstance(apiService: KuwoApiService): SongCache {
             return instance ?: synchronized(this) {
@@ -287,29 +320,30 @@ class SongCache(private val apiService: KuwoApiService) {
 
         fun setAppContext(context: Context) {
             appContext = context.applicationContext
-            // 直接取 BinkeMusicApp 已通过 ImageLoaderFactory 配置好的单例
+            // 关键：必须与 AsyncImage 走 Coil.imageLoader(context) → ImageLoaderFactory.newImageLoader()
+            // 拿到的同一个 ImageLoader 实例，才能共享 memoryCache。直接拿 BinkeMusicApp.imageLoader 单例。
             val app = context.applicationContext as? com.binke.music.BinkeMusicApp
-            imageLoader = app?.let {
-                coil.ImageLoader.Builder(it)
-                    .memoryCache {
-                        coil.memory.MemoryCache.Builder(it)
-                            .maxSizePercent(0.25)
-                            .build()
-                    }
-                    .diskCache {
-                        coil.disk.DiskCache.Builder()
-                            .directory(it.cacheDir.resolve("image_cache"))
-                            .maxSizeBytes(0L)
-                            .build()
-                    }
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.DISABLED)
-                    .crossfade(true)
-                    .build()
+            imageLoader = app?.imageLoader
+
+            // 初始化日志文件到 app 私有外部目录（不需要 root/权限，user 文件管理器直接看）
+            try {
+                val logsDir = appContext!!.getExternalFilesDir("logs")
+                if (logsDir != null) {
+                    if (!logsDir.exists()) logsDir.mkdirs()
+                    val f = File(logsDir, "binke_preload.log")
+                    if (!f.exists()) f.createNewFile()
+                    logFile = f
+                    val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(Date())
+                    f.appendText("\n=== binke preload log session @ $now ===\n")
+                    f.appendText("日志路径: ${f.absolutePath}\n")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "初始化日志文件失败: ${e.message}")
             }
         }
 
         fun getAppContext(): Context? = appContext
         fun getImageLoader(): ImageLoader? = imageLoader
+        fun getLogFile(): File? = logFile
     }
 }
