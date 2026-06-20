@@ -651,11 +651,22 @@ class KuwoApiService {
                 .addHeader("Referer", "https://m.kugou.com/")
                 .build()
             val lrcBytes = browserClient.newCall(lrcReq).execute().use { it.body?.bytes() ?: return Result.failure(Exception("酷狗歌词请求为空")) }
-            // 酷狗默认 GBK 编码（部分歌曲 UTF-8，先试 GBK 失败再试 UTF-8）
+            // KRC 实际是 UTF-8（多数带 BOM 0xEF 0xBB 0xBF，少数无 BOM 也合法 UTF-8）
+            // 历史误判 GBK 导致中文乱码（2026-06-20 七里香 bug 反馈）
             val lrcText = try {
-                String(lrcBytes, Charset.forName("GBK"))
+                if (lrcBytes.size >= 3 &&
+                    lrcBytes[0] == 0xEF.toByte() &&
+                    lrcBytes[1] == 0xBB.toByte() &&
+                    lrcBytes[2] == 0xBF.toByte()) {
+                    // 有 BOM：跳过前 3 字节用 UTF-8
+                    String(lrcBytes, 3, lrcBytes.size - 3, Charsets.UTF_8)
+                } else {
+                    // 无 BOM：直接 UTF-8（KRC 全网统一 UTF-8）
+                    String(lrcBytes, Charsets.UTF_8)
+                }
             } catch (_: Exception) {
-                String(lrcBytes, Charset.forName("UTF-8"))
+                // 兜底 GBK（极少数历史 KRC 可能用 GBK）
+                String(lrcBytes, Charset.forName("GBK"))
             }
             if (lrcText.isBlank()) return Result.success(emptyList())
             // 过滤 KRC 扩展标签 [id:xxx] [ti:title] [ar:artist] [al:album] [by:author] [offset:ms] [karaoke:xxx] [hash:xxx]
