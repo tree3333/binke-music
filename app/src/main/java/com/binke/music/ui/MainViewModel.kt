@@ -121,10 +121,15 @@ class MainViewModel(
     val playbackDebugParams: StateFlow<String?> = _playbackDebugParams.asStateFlow()
 
     /**
-     * 【1.0.36】记录"已对哪首 song 自动重试过"——同一首只允许自动重试 1 次，
-     * 第二次 onPlayerError 直接弹窗给 user。切歌时（_currentSong 改变）允许再重试。
+     * 【1.0.36】记录"上次自动重试时间戳 (ms)"——10s 内只允许自动重试 1 次，
+     * 防止同首 / 短时间内连续 IO_BAD_HTTP_STATUS 卡死循环。
      */
-    private var lastAutoRetriedSongId: String? = null
+    private var lastAutoRetryAt: Long = 0L
+
+    companion object {
+        /** 【1.0.36】onPlaybackError 自动重试冷却时间（ms） */
+        private const val AUTO_RETRY_COOLDOWN_MS = 10_000L
+    }
 
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
@@ -238,8 +243,6 @@ class MainViewModel(
             if (newIndex in playlist.indices) {
                 _currentIndex.value = newIndex
                 _currentSong.value = playlist[newIndex]
-                // 【1.0.36】MediaSession 切歌（同 next/prev / 锁屏按钮）也重置自动重试标记
-                lastAutoRetriedSongId = null
                 triggerCoverPrediction(playlist[newIndex].pic)
                 _currentPosition.value = 1500L
                 // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
@@ -459,8 +462,6 @@ class MainViewModel(
             snapshotSong = song
             _currentIndex.value = snapshotIdx
         }
-        // 【1.0.36】切到新 song → 重置自动重试标记，新 song 允许再重试 1 次
-        lastAutoRetriedSongId = null
 
         viewModelScope.launch {
             _isLoading.value = true
@@ -793,37 +794,41 @@ class MainViewModel(
 
     /**
      * 【1.0.36】onPlaybackError 处理函数。
-     * - IO_BAD_HTTP_STATUS（URL 过期/CDN 鉴权失效）且当前 song 没自动重试过 → 静默重试 1 次
-     *   重试成功不弹窗；新 URL 拉不到才弹窗给 user
+     * - IO_BAD_HTTP_STATUS（URL 过期/CDN 鉴权失效）→ 距离上次自动重试 > 10s 时静默重试 1 次
+     *   重试成功不弹窗；新 URL 拉不到 / 仍失败才弹窗给 user
      * - 其它错误（解码失败、网络断开等）直接弹窗
      *
-     * lastAutoRetriedSongId 在 playSong / onMediaItemTransition 切歌时重置，
-     * 保证新 song 允许再自动重试 1 次。
+     * 用 10s 时间窗口而非"同首只 1 次"：retry 周期（拉新 URL + prepare + 拉流失败）通常 1-3s，
+     * 10s 足够完整周期；既给网络抖动留兜底窗口，又防止卡死循环。
      */
     private fun handlePlaybackError(error: String) {
-        val currentSongId = _currentSong.value?.id
+        val song = _currentSong.value
+        if (song == null) {
+            showPlaybackError(error)
+            return
+        }
         val isHttpStatusError = error.contains("ERROR_CODE_IO_BAD_HTTP_STATUS", ignoreCase = true)
-        val shouldAutoRetry = isHttpStatusError && currentSongId != null && currentSongId != lastAutoRetriedSongId
-        if (shouldAutoRetry) {
-            val song = _currentSong.value ?: return
-            lastAutoRetriedSongId = currentSongId
-            viewModelScope.launch(Dispatchers.IO) {
-                songCache.invalidatePlayUrl(song)
-                val newUrl = songCache.loadOrGetPlayUrl(song)
-                withContext(Dispatchers.Main) {
-                    if (!newUrl.isNullOrBlank() && musicPlayer.retry(newUrl)) {
-                        android.util.Log.i(
-                            "MainViewModel",
-                            "auto-retry OK: songId=$currentSongId, url=${newUrl.take(60)}"
-                        )
-                    } else {
-                        // 新 URL 拉不到 / retry 失败 → 弹窗
-                        showPlaybackError(error)
-                    }
+        val now = System.currentTimeMillis()
+        val canAutoRetry = isHttpStatusError && (now - lastAutoRetryAt) > AUTO_RETRY_COOLDOWN_MS
+        if (!canAutoRetry) {
+            showPlaybackError(error)
+            return
+        }
+        lastAutoRetryAt = now
+        viewModelScope.launch(Dispatchers.IO) {
+            songCache.invalidatePlayUrl(song)
+            val newUrl = songCache.loadOrGetPlayUrl(song)
+            withContext(Dispatchers.Main) {
+                if (!newUrl.isNullOrBlank() && musicPlayer.retry(newUrl)) {
+                    android.util.Log.i(
+                        "MainViewModel",
+                        "auto-retry OK: songId=${song.id}, url=${newUrl.take(60)}"
+                    )
+                } else {
+                    // 新 URL 拉不到 / retry 失败 → 弹窗
+                    showPlaybackError(error)
                 }
             }
-        } else {
-            showPlaybackError(error)
         }
     }
 
