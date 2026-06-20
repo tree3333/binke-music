@@ -26,15 +26,26 @@ import java.util.Locale
  */
 class SongCache(private val apiService: KuwoApiService) {
 
+    /**
+     * 【2026-06-19 修复 lyrics null/emptyList 混淆 bug】增加 lyricsTried 标志位。
+     * 之前 lyrics=null 和 lyrics=emptyList() 在命中分支无法区分 → 4 源全失败时
+     * emptyList() 被写进缓存，下次永远命中空列表不重试。
+     * 改用三态：null = 未尝试；lyricsTried=true + lyrics=[] = 已确认无歌词；lyricsTried=true + lyrics=[…] = 有歌词。
+     * 配合 evictOutsideWindow：被 evict 后 lyricsTried 随 entry 一起清空，下次重新走 4 源。
+     */
     data class Entry(
         val playUrl: String?,
         val pic: String?,
         val lyrics: List<LrcLine>?,
+        val lyricsTried: Boolean = false,
+        /** 【1.0.33 修复】空 list 缓存的尝试时间戳。null/0 = 未尝试。空 list 5 分钟后重试 4 源，
+         *  解决"装 1.0.31 当时 4 源全失败 → 100 首歌全缓存空 list → 永远不重试"bug。 */
+        val lyricsTriedAt: Long = 0L,
         val coverBitmap: Bitmap? = null
     )
 
-    // 缓存 key 使用 Song.id（rid.toString()）
-    private val cache = mutableMapOf<String, Entry>()
+    // 缓存 key 使用 Song.id（rid.toString()）。跨 IO/viewModel 协程读写，必须并发安全。
+    private val cache: java.util.concurrent.ConcurrentHashMap<String, Entry> = java.util.concurrent.ConcurrentHashMap()
 
     // 封面 Bitmap 独立缓存（与 cache.Entry.coverBitmap 同步），直接存 Bitmap 供 Compose Image() 使用
     // 【核心命中判断】hasCover 直接看 cachedBitmaps.containsKey(song.id)，不用 preloadedCoverUrls 这套 URL 集合
@@ -55,6 +66,23 @@ class SongCache(private val apiService: KuwoApiService) {
     /** 同步获取，已命中缓存返回 Entry，否则返回 null */
     fun get(song: Song): Entry? = cache[song.id]
 
+    /** 写入某首歌的 playUrl（保留 pic/lyrics/coverBitmap） */
+    fun putPlayUrl(song: Song, url: String) {
+        val existing = cache[song.id]
+        cache[song.id] = Entry(
+            playUrl = url,
+            pic = existing?.pic ?: song.pic,
+            lyrics = existing?.lyrics,
+            coverBitmap = existing?.coverBitmap
+        )
+    }
+
+    /** 清除某首歌的 playUrl（强制下次 getPlayUrl 重新拉） */
+    fun invalidatePlayUrl(song: Song) {
+        val existing = cache[song.id] ?: return
+        cache[song.id] = existing.copy(playUrl = null)
+    }
+
     /** 缓存是否存在且可用（playUrl 非空） */
     fun hasPlayUrl(song: Song): Boolean =
         cache[song.id]?.playUrl != null
@@ -73,72 +101,217 @@ class SongCache(private val apiService: KuwoApiService) {
         cache[song.id]?.playUrl?.let { return it }
         val url = apiService.getPlayUrl(song.musicRid).url
         // 写回时用当前 song.pic（已增强），保持缓存图片URL与UI一致
-        cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics)
+        cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics, coverBitmap = cache[song.id]?.coverBitmap)
         return url
     }
 
-    /** 加载歌词并写缓存 */
+    /**
+     * 加载歌词并写缓存。
+     * 【2026-06-19 修复】命中条件改为 `lyricsTried == true`：null（未尝试）走完整 4 源，
+     * emptyList（已确认无歌词）直接返回不再走网络。被 evict 后 entry 整个删除，lyricsTried 一起清空，下次重试。
+     */
     suspend fun loadLyrics(song: Song): List<LrcLine> {
-        cache[song.id]?.lyrics?.let { return it }
-
-        var lyrics: List<LrcLine> = emptyList()
-
-        // 酷我歌词
-        var kr = apiService.getLyrics(song.rid.toString())
-        for (attempt in 0..2) {
-            if (kr.isSuccess) {
-                lyrics = kr.getOrNull() ?: emptyList()
-                if (lyrics.isNotEmpty()) break
-            }
-            delay(500)
+        val t0 = System.currentTimeMillis()
+        val existing = cache[song.id]
+        // 【1.0.33 修复】cacheHit 条件：已尝试过 4 源 && (有歌词 OR 距上次 > 5 分钟)
+        // 解决空 list 缓存永远不重试 bug——空 list 5 分钟后会自动重新走 4 源
+        if (existing?.lyricsTried == true &&
+            (existing.lyrics?.isNotEmpty() == true ||
+             (t0 - existing.lyricsTriedAt) > 5 * 60 * 1000L)) {
+            log("loadLyrics: ${song.name} (id=${song.id}) cacheHit=true, lines=${existing.lyrics?.size ?: 0}, age=${(t0 - existing.lyricsTriedAt) / 1000}s")
+            return existing.lyrics ?: emptyList()
+        }
+        if (existing?.lyricsTried == true) {
+            log("loadLyrics: ${song.name} (id=${song.id}) cacheHit-empty-but-fresh, age=${(t0 - existing.lyricsTriedAt) / 1000}s, will retry 4 sources")
+        } else {
+            log("loadLyrics: ${song.name} (id=${song.id}) cacheMiss, will try 4 sources")
         }
 
-        // 网易云歌词兜底
+        var lyrics: List<LrcLine> = emptyList()
+        var sourcesTried = 0  // 实际尝试过的源数（成功+失败），用于出口日志
+
+        // 1. 酷我歌词（musicId 直查）
+        var kr = apiService.getLyrics(song.rid.toString())
+        sourcesTried++
+        if (kr.isSuccess) {
+            val n = kr.getOrNull()?.size ?: 0
+            if (n > 0) {
+                log("  lyric-kuwo: success, lines=$n")
+                lyrics = kr.getOrNull()!!
+            } else {
+                log("  lyric-kuwo: 200 but empty lrclist")
+            }
+        } else {
+            log("  lyric-kuwo: fail, err=${kr.exceptionOrNull()?.message?.take(80)}")
+            // 失败时重试 2 次（之前是固定 retry 3 次无脑 delay，慢；改成 0+2 = 总共 3 次）
+            for (attempt in 0..1) {
+                delay(500)
+                kr = apiService.getLyrics(song.rid.toString())
+                sourcesTried++
+                if (kr.isSuccess) {
+                    val n = kr.getOrNull()?.size ?: 0
+                    if (n > 0) {
+                        log("  lyric-kuwo: success (retry ${attempt + 1}), lines=$n")
+                        lyrics = kr.getOrNull()!!
+                    } else {
+                        log("  lyric-kuwo: 200 but empty lrclist (retry ${attempt + 1})")
+                    }
+                    break
+                } else {
+                    log("  lyric-kuwo: fail (retry ${attempt + 1}), err=${kr.exceptionOrNull()?.message?.take(80)}")
+                }
+            }
+        }
+
+        // 2. 网易云歌词兜底（歌名+歌手搜，再拿歌词）
         if (lyrics.isEmpty()) {
             val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
             var nr = apiService.searchLyricsNetEase(cleanName, song.artist)
-            for (attempt in 0..2) {
-                if (nr.isSuccess) {
-                    val ne = nr.getOrNull() ?: emptyList()
-                    if (ne.isNotEmpty()) { lyrics = ne; break }
+            sourcesTried++
+            if (nr.isSuccess) {
+                val n = nr.getOrNull()?.size ?: 0
+                if (n > 0) {
+                    log("  lyric-163: success, lines=$n")
+                    lyrics = nr.getOrNull()!!
+                } else {
+                    log("  lyric-163: 200 but empty result")
                 }
-                delay(500)
+            } else {
+                log("  lyric-163: fail, err=${nr.exceptionOrNull()?.message?.take(80)}")
+                for (attempt in 0..1) {
+                    delay(500)
+                    nr = apiService.searchLyricsNetEase(cleanName, song.artist)
+                    sourcesTried++
+                    if (nr.isSuccess) {
+                        val n = nr.getOrNull()?.size ?: 0
+                        if (n > 0) {
+                            log("  lyric-163: success (retry ${attempt + 1}), lines=$n")
+                            lyrics = nr.getOrNull()!!
+                        } else {
+                            log("  lyric-163: 200 but empty (retry ${attempt + 1})")
+                        }
+                        break
+                    } else {
+                        log("  lyric-163: fail (retry ${attempt + 1}), err=${nr.exceptionOrNull()?.message?.take(80)}")
+                    }
+                }
             }
         }
 
-        // QQ 歌词兜底
+        // 3. 酷狗歌词兜底（覆盖网易云/lrclib 缺失的冷门中文歌，2026-06-20 加）
+        if (lyrics.isEmpty()) {
+            val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
+            var kg = apiService.searchLyricsKugou(cleanName, song.artist)
+            sourcesTried++
+            if (kg.isSuccess) {
+                val n = kg.getOrNull()?.size ?: 0
+                if (n > 0) {
+                    log("  lyric-kugou: success, lines=$n")
+                    lyrics = kg.getOrNull()!!
+                } else {
+                    log("  lyric-kugou: 200 but empty result")
+                }
+            } else {
+                log("  lyric-kugou: fail, err=${kg.exceptionOrNull()?.message?.take(80)}")
+                delay(300)
+                kg = apiService.searchLyricsKugou(cleanName, song.artist)
+                sourcesTried++
+                if (kg.isSuccess) {
+                    val n = kg.getOrNull()?.size ?: 0
+                    if (n > 0) {
+                        log("  lyric-kugou: success (retry 1), lines=$n")
+                        lyrics = kg.getOrNull()!!
+                    } else {
+                        log("  lyric-kugou: 200 but empty (retry 1)")
+                    }
+                } else {
+                    log("  lyric-kugou: fail (retry 1), err=${kg.exceptionOrNull()?.message?.take(80)}")
+                }
+            }
+        }
+
+        // 4. QQ 音乐歌词兜底
         if (lyrics.isEmpty()) {
             val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
             var qr = apiService.searchLyricsQQ(cleanName, song.artist)
-            for (attempt in 0..2) {
-                if (qr.isSuccess) {
-                    val qq = qr.getOrNull() ?: emptyList()
-                    if (qq.isNotEmpty()) { lyrics = qq; break }
+            sourcesTried++
+            if (qr.isSuccess) {
+                val n = qr.getOrNull()?.size ?: 0
+                if (n > 0) {
+                    log("  lyric-qq: success, lines=$n")
+                    lyrics = qr.getOrNull()!!
+                } else {
+                    log("  lyric-qq: 200 but empty result")
                 }
-                delay(500)
+            } else {
+                log("  lyric-qq: fail, err=${qr.exceptionOrNull()?.message?.take(80)}")
+                for (attempt in 0..1) {
+                    delay(500)
+                    qr = apiService.searchLyricsQQ(cleanName, song.artist)
+                    sourcesTried++
+                    if (qr.isSuccess) {
+                        val n = qr.getOrNull()?.size ?: 0
+                        if (n > 0) {
+                            log("  lyric-qq: success (retry ${attempt + 1}), lines=$n")
+                            lyrics = qr.getOrNull()!!
+                        } else {
+                            log("  lyric-qq: 200 but empty (retry ${attempt + 1})")
+                        }
+                        break
+                    } else {
+                        log("  lyric-qq: fail (retry ${attempt + 1}), err=${qr.exceptionOrNull()?.message?.take(80)}")
+                    }
+                }
             }
         }
 
-        // lrclib.net 公共歌词库兜底
+        // 5. lrclib.net 公共歌词库兜底
         if (lyrics.isEmpty()) {
             val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
             var lr = apiService.searchLyricsLrclib(cleanName, song.artist)
-            for (attempt in 0..1) {
-                if (lr.isSuccess) {
-                    val lb = lr.getOrNull() ?: emptyList()
-                    if (lb.isNotEmpty()) { lyrics = lb; break }
+            sourcesTried++
+            if (lr.isSuccess) {
+                val n = lr.getOrNull()?.size ?: 0
+                if (n > 0) {
+                    log("  lyric-lrclib: success, lines=$n")
+                    lyrics = lr.getOrNull()!!
+                } else {
+                    log("  lyric-lrclib: 200 but empty result")
                 }
+            } else {
+                log("  lyric-lrclib: fail, err=${lr.exceptionOrNull()?.message?.take(80)}")
                 delay(300)
+                lr = apiService.searchLyricsLrclib(cleanName, song.artist)
+                sourcesTried++
+                if (lr.isSuccess) {
+                    val n = lr.getOrNull()?.size ?: 0
+                    if (n > 0) {
+                        log("  lyric-lrclib: success (retry 1), lines=$n")
+                        lyrics = lr.getOrNull()!!
+                    } else {
+                        log("  lyric-lrclib: 200 but empty (retry 1)")
+                    }
+                } else {
+                    log("  lyric-lrclib: fail (retry 1), err=${lr.exceptionOrNull()?.message?.take(80)}")
+                }
             }
         }
 
-        // 写缓存
-        val existing = cache[song.id]
+        // 写回：【关键】lyricsTried = true，标记"已尝试过 4 源"。即使 lyrics=emptyList()，
+        // 下次命中也能区分"已查过没结果"（直接返回空，不再重试）和"未查"（走完整 4 源）。
+        // 配合 evictOutsideWindow 窗口外 entry 整体删除 → lyricsTried 一起被清空 → 重新走 4 源。
+        // 【1.0.33 修复】同步记录 lyricsTriedAt 时间戳——空 list 5 分钟后会重试。
+        val ex = cache[song.id]
         cache[song.id] = Entry(
-            playUrl = existing?.playUrl,
-            pic = existing?.pic ?: song.pic,
-            lyrics = lyrics
+            playUrl = ex?.playUrl,
+            pic = ex?.pic ?: song.pic,
+            lyrics = lyrics,
+            lyricsTried = true,
+            lyricsTriedAt = t0,
+            coverBitmap = ex?.coverBitmap
         )
+        val cost = System.currentTimeMillis() - t0
+        log("loadLyrics done: ${song.name} lines=${lyrics.size}, tried=$sourcesTried, cost=${cost}ms")
         return lyrics
     }
 
@@ -174,8 +347,13 @@ class SongCache(private val apiService: KuwoApiService) {
             if (cache[song.id]?.playUrl == null) {
                 scope.launch {
                     val url = apiService.getPlayUrl(song.musicRid).url
-                    // 用 song.pic（已增强），确保 Coil 预加载的 URL 与 SongCache 缓存的 pic 一致
-                    cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics)
+                    val existing = cache[song.id]
+                    cache[song.id] = Entry(
+                        playUrl = url,
+                        pic = song.pic,
+                        lyrics = existing?.lyrics,
+                        coverBitmap = existing?.coverBitmap
+                    )
                 }
             }
         }
@@ -209,16 +387,14 @@ class SongCache(private val apiService: KuwoApiService) {
      * 全 false → 重复 loader.execute 6 张，浪费 5 张下载）。
      */
     fun preloadPics(songs: List<Song>) {
-        log("preloadPics 收到 ${songs.size} 首: ${songs.map { it.name }.take(6)}")
-        songs.forEach { song ->
+        val misses = songs.filter { song ->
+            song.pic.isNotBlank() && !cachedBitmaps.containsKey(song.id)
+        }
+        if (misses.isEmpty()) return
+
+        log("preloadPics 收到 ${misses.size} 首: ${misses.map { it.name }.take(6)}")
+        misses.forEach { song ->
             val picUrl = song.pic
-            if (picUrl.isNullOrBlank()) return@forEach
-            // 命中判断：按 song.id 看 cachedBitmaps（之前用 pic URL set 有 bug，已废弃）
-            if (cachedBitmaps.containsKey(song.id)) {
-                log("  ✓ 命中已预加载: ${song.name} (cached=${cachedBitmaps[song.id]?.let { "${it.width}x${it.height}" } ?: "无Bitmap"})")
-                pendingHits.add("封面命中缓存")
-                return@forEach
-            }
             // 未命中：启动协程真正下载并解码
             val job = scope.launch {
                 try {
@@ -251,6 +427,13 @@ class SongCache(private val apiService: KuwoApiService) {
                             }
                             if (bitmap != null) {
                                 cachedBitmaps[song.id] = bitmap
+                                val existing = cache[song.id]
+                                cache[song.id] = Entry(
+                                    playUrl = existing?.playUrl,
+                                    pic = existing?.pic ?: song.pic,
+                                    lyrics = existing?.lyrics,
+                                    coverBitmap = bitmap
+                                )
                                 log("  ✓ 封面就绪: ${song.name} (${bitmap.width}x${bitmap.height}, ${bitmap.byteCount/1024}KB)")
                                 // Bitmap 就绪后才标记命中，确保 toast 触发时图片已可直接渲染
                                 pendingHits.add("封面命中缓存")
@@ -320,6 +503,13 @@ class SongCache(private val apiService: KuwoApiService) {
                 }
                 if (bitmap != null) {
                     cachedBitmaps[song.id] = bitmap
+                    val existing = cache[song.id]
+                    cache[song.id] = Entry(
+                        playUrl = existing?.playUrl,
+                        pic = existing?.pic ?: song.pic,
+                        lyrics = existing?.lyrics,
+                        coverBitmap = bitmap
+                    )
                     results[song.id] = bitmap
                     pendingHits.add("封面命中缓存")
                 } else {

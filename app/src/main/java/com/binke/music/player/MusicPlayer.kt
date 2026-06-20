@@ -10,6 +10,10 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.binke.music.data.model.Song
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 简单音乐播放器
@@ -19,6 +23,15 @@ class MusicPlayer(private val context: Context) {
     private var player: ExoPlayer? = null
     private var isPlaylistSet = false  // true = setPlaylist() 已调用，play() 不应清空列表
     private val handler = Handler(Looper.getMainLooper())
+    private var playbackLogFile: File? = null  // binke_playback.log，无 adb 时 user 可直接文件管理器查看
+
+    private fun fileLog(msg: String) {
+        try {
+            val f = playbackLogFile ?: return
+            val ts = SimpleDateFormat("HH:mm:ss.SSS", Locale.CHINA).format(Date())
+            f.appendText("[$ts] $msg\n")
+        } catch (_: Exception) {}
+    }
 
     /** 暴露给 ViewModel 用于恢复时同步状态 */
     fun getCurrentMediaItem(): MediaItem? = player?.currentMediaItem
@@ -47,6 +60,8 @@ class MusicPlayer(private val context: Context) {
                         onDurationChanged?.invoke(p.duration)
                     }
                 }
+                // 【1.0.31 调试】每 500ms 写一次 progress tick，确认 ExoPlayer 内部 clock 动不动
+                fileLog("progressTick: state=${p.playbackState}, isPlaying=${p.isPlaying}, playWhenReady=${p.playWhenReady}, position=${p.currentPosition}, duration=${p.duration}, bufferedPos=${p.bufferedPosition}")
             }
             handler.postDelayed(this, 500)
         }
@@ -54,6 +69,21 @@ class MusicPlayer(private val context: Context) {
 
     fun initialize() {
         if (player != null) return
+
+        // 初始化 playback log（无 adb 时 user 用文件管理器直接看）
+        try {
+            val logsDir = context.getExternalFilesDir("logs")
+            if (logsDir != null) {
+                if (!logsDir.exists()) logsDir.mkdirs()
+                val f = File(logsDir, "binke_playback.log")
+                if (!f.exists()) f.createNewFile()
+                playbackLogFile = f
+                f.appendText("\n=== binke playback log session @ ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(Date())} ===\n")
+                f.appendText("日志路径: ${f.absolutePath}\n")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "playbackLogFile 初始化失败: ${e.message}")
+        }
 
         val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
             .setUsage(androidx.media3.common.C.USAGE_MEDIA)
@@ -70,6 +100,14 @@ class MusicPlayer(private val context: Context) {
                 repeatMode = Player.REPEAT_MODE_OFF
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
+                        val stateName = when (state) {
+                            Player.STATE_IDLE -> "IDLE"
+                            Player.STATE_BUFFERING -> "BUFFERING"
+                            Player.STATE_READY -> "READY"
+                            Player.STATE_ENDED -> "ENDED"
+                            else -> "UNKNOWN($state)"
+                        }
+                        fileLog("onPlaybackStateChanged: state=$stateName, playWhenReady=$playWhenReady, currentPosition=$currentPosition, mediaItemCount=$mediaItemCount")
                         when (state) {
                             Player.STATE_READY -> {
                                 onDurationChanged?.invoke(duration)
@@ -83,15 +121,18 @@ class MusicPlayer(private val context: Context) {
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        fileLog("onIsPlayingChanged: isPlaying=$isPlaying, playWhenReady=$playWhenReady, state=${playbackState}, currentPosition=$currentPosition")
                         onPlaybackStateChanged?.invoke(isPlaying)
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
                         Log.e(TAG, "onPlayerError code=${error.errorCodeName} msg=${error.message}", error)
+                        fileLog("onPlayerError: code=${error.errorCodeName} msg=${error.message}")
                         onPlaybackError?.invoke("[${error.errorCodeName}] ${error.message}")
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        fileLog("onMediaItemTransition: reason=$reason, newIndex=${currentMediaItemIndex}, newMediaId=${mediaItem?.mediaId}, mediaItemCount=$mediaItemCount")
                         // AUTO（自动播完切下一首）+ SEEK（锁屏/通知栏上一首/下一首按钮）都要处理
                         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                             reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
@@ -108,6 +149,7 @@ class MusicPlayer(private val context: Context) {
                                                 .setUri(cachedUrl)
                                                 .build()
                                             p.replaceMediaItem(newIndex, updatedItem)
+                                            fileLog("onMediaItemTransition: replaceMediaItem idx=$newIndex with cachedUrl=${cachedUrl.take(60)}")
                                         }
                                     }
                                     onMediaItemTransition?.invoke(newIndex)
@@ -124,8 +166,11 @@ class MusicPlayer(private val context: Context) {
     fun play(url: String) {
         val p = player ?: run {
             Log.e(TAG, "play() called but player is null — initialize() was not called!")
+            fileLog("play() called but player is null")
             return
         }
+
+        fileLog("play() called: url=${url.take(80)}, isPlaylistSet=$isPlaylistSet, mediaItemCount=${p.mediaItemCount}, state=${p.playbackState}, playWhenReady=${p.playWhenReady}, currentMediaItemIndex=${p.currentMediaItemIndex}")
 
         if (isPlaylistSet && p.mediaItemCount > 0) {
             // 播放列表已存在，只更新当前项的 URL，保留 metadata（封面等）
@@ -139,6 +184,7 @@ class MusicPlayer(private val context: Context) {
             p.replaceMediaItem(idx, updatedItem)
             p.prepare()
             p.playWhenReady = true
+            fileLog("play() playlist分支: replaceMediaItem idx=$idx, then prepare+playWhenReady=true")
         } else {
             // 首次播放或无播放列表，清空并设置单个媒体项
             p.stop()
@@ -151,6 +197,7 @@ class MusicPlayer(private val context: Context) {
             p.prepare()
             p.playWhenReady = true
             isPlaylistSet = true
+            fileLog("play() 首播分支: setMediaItem url=${url.take(60)}, prepare+playWhenReady=true")
         }
     }
 
@@ -189,6 +236,12 @@ class MusicPlayer(private val context: Context) {
         player?.repeatMode = mode
     }
 
+    /** 同步 ExoPlayer 的 shuffle 模式——AUTO 切歌时 ExoPlayer 才知道要不要随机下一首 */
+    fun setShuffleMode(enabled: Boolean) {
+        player?.shuffleModeEnabled = enabled
+        fileLog("setShuffleMode: enabled=$enabled, exoplayer shuffleModeEnabled=${player?.shuffleModeEnabled}")
+    }
+
     /**
      * 初始化播放列表（供锁屏上一首/下一首使用）。
      * 所有 URL 必须已预取完毕，不允许空 URI。
@@ -198,6 +251,7 @@ class MusicPlayer(private val context: Context) {
         player?.let { p ->
             if (songs.isEmpty()) return
             isPlaylistSet = true
+            fileLog("setPlaylist: songs=${songs.size}, currentIndex=$currentIndex, urlMap.size=${urls.size}")
             val mediaItems = songs.mapIndexed { i, song ->
                 val url = urls[song.id] ?: ""
                 MediaItem.Builder()
@@ -213,6 +267,7 @@ class MusicPlayer(private val context: Context) {
                     .build()
             }
             p.setMediaItems(mediaItems, currentIndex, 0)
+            fileLog("setPlaylist: setMediaItems done, mediaItemCount=${p.mediaItemCount}, currentMediaItemIndex=${p.currentMediaItemIndex}")
             // 不在这里 prepare，由 play() 负责
         }
     }

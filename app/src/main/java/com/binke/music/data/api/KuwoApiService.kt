@@ -604,6 +604,72 @@ class KuwoApiService {
         }
     }
 
+    /**
+     * 酷狗歌词源（备用，2026-06-20 加：覆盖网易云/lrclib 缺失的冷门中文歌）
+     * 1) 搜歌 → hash: https://msearch.kugou.com/api/v3/search/song?keyword={q}&page=1&pagesize=5
+     * 2) 取歌词 (GBK 编码): https://m.kugou.com/app/i/krc.php?cmd=100&hash={hash}&timelength=1
+     * KRC 格式带扩展标签: [id:xxx] [ti:title] [ar:artist] [al:album] [by:author] [offset:ms] [karaoke:xxx]
+     * 需过滤标签再用 parseLrcText 解析时间戳行
+     */
+    fun searchLyricsKugou(name: String, artist: String): Result<List<LrcLine>> {
+        return try {
+            val query = URLEncoder.encode("${name.trim()} ${artist.trim()}", "UTF-8")
+            // 1) 搜索
+            val searchUrl = "https://msearch.kugou.com/api/v3/search/song?keyword=$query&page=1&pagesize=5"
+            val searchReq = Request.Builder()
+                .url(searchUrl)
+                .get()
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 Chrome/96.0.4664.45 Mobile Safari/537.36")
+                .addHeader("Referer", "https://m.kugou.com/")
+                .build()
+            val searchResp = browserClient.newCall(searchReq).execute().use { it.body?.string() ?: return Result.failure(Exception("酷狗搜索请求为空")) }
+            val searchJson = JSONObject(searchResp)
+            val songs = (searchJson.optJSONObject("data")?.optJSONArray("info")) ?: return Result.success(emptyList())
+            if (songs.length() == 0) return Result.success(emptyList())
+
+            // 优先取歌手匹配的（避免同名 remix / 翻唱）
+            var pickIdx = 0
+            if (artist.isNotBlank()) {
+                for (i in 0 until minOf(5, songs.length())) {
+                    val singer = songs.getJSONObject(i).optString("singername", "")
+                    if (singer.isNotBlank() && (artist.trim() in singer || singer in artist.trim())) {
+                        pickIdx = i
+                        break
+                    }
+                }
+            }
+            val pick = songs.getJSONObject(pickIdx)
+            val hash = pick.optString("hash", "")
+            if (hash.isBlank()) return Result.failure(Exception("酷狗无 hash"))
+
+            // 2) 取歌词 (GBK 编码)
+            val lrcUrl = "https://m.kugou.com/app/i/krc.php?cmd=100&hash=$hash&timelength=1"
+            val lrcReq = Request.Builder()
+                .url(lrcUrl)
+                .get()
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 Chrome/96.0.4664.45 Mobile Safari/537.36")
+                .addHeader("Referer", "https://m.kugou.com/")
+                .build()
+            val lrcBytes = browserClient.newCall(lrcReq).execute().use { it.body?.bytes() ?: return Result.failure(Exception("酷狗歌词请求为空")) }
+            // 酷狗默认 GBK 编码（部分歌曲 UTF-8，先试 GBK 失败再试 UTF-8）
+            val lrcText = try {
+                String(lrcBytes, Charset.forName("GBK"))
+            } catch (_: Exception) {
+                String(lrcBytes, Charset.forName("UTF-8"))
+            }
+            if (lrcText.isBlank()) return Result.success(emptyList())
+            // 过滤 KRC 扩展标签 [id:xxx] [ti:title] [ar:artist] [al:album] [by:author] [offset:ms] [karaoke:xxx] [hash:xxx]
+            val cleaned = lrcText.lineSequence()
+                .map { line -> line.replace(Regex("\\[(id|ti|ar|al|by|offset|karaoke|hash|language):[^\\]]*\\]"), "") }
+                .joinToString("\n")
+            val lines = parseLrcText(cleaned)
+            Result.success(lines)
+        } catch (e: Exception) {
+            Log.e("KuwoApi", "searchLyricsKugou error", e)
+            Result.failure(e)
+        }
+    }
+
     private fun parseLrcText(lrcText: String): List<LrcLine> {
         return lrcText.lineSequence()
             .mapNotNull { line ->

@@ -143,13 +143,12 @@ class MainViewModel(
         val song = _currentSong.value ?: return
         lyricsJob?.cancel()
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-            val cached = songCache.get(song)?.lyrics
-            if (cached != null) {
-                if (isActive) _lyrics.value = cached
-            } else {
-                val loaded = songCache.loadLyrics(song)
-                if (isActive) _lyrics.value = loaded
-            }
+            // 【1.0.33 修复】不再走 cache[].lyrics 直接读取——空 list 会误判为"已缓存"且绕过
+            // SongCache.loadLyrics 的 cacheHit 逻辑（导致 4 源全失败时 100 首歌全缓存空 list 永远不重试）。
+            // 改用 loadLyrics 自己处理 cacheHit：lyricsTried=true + (有歌词 OR 距上次 > 5 分钟) 才命中，
+            // 否则重新走 4 源。
+            val loaded = songCache.loadLyrics(song)
+            if (isActive) _lyrics.value = loaded
         }
     }
     /** 防止 MediaSession 触发的 onMediaItemTransition 与 playSong 之间循环 */
@@ -408,6 +407,9 @@ class MainViewModel(
                 else -> androidx.media3.common.Player.REPEAT_MODE_OFF
             }
         )
+        // 同步 ExoPlayer shuffle mode（修复 AUTO 切歌不随机——手动下一首/上一首 MainViewModel 自己算随机索引
+        // 是 work 的，但 AUTO 切歌走 ExoPlayer 内部 timeline，shuffleModeEnabled=false 永远是顺序）
+        musicPlayer.setShuffleMode(newMode == PlayMode.SHUFFLE)
     }
 
     fun seekTo(position: Long) {
