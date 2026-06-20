@@ -35,6 +35,8 @@ class SongCache(private val apiService: KuwoApiService) {
      */
     data class Entry(
         val playUrl: String?,
+        /** playUrl 拉取时间戳（ms），用于 TTL 失效判断。0L = 无 URL */
+        val playUrlFetchedAt: Long = 0L,
         val pic: String?,
         val lyrics: List<LrcLine>?,
         val lyricsTried: Boolean = false,
@@ -42,7 +44,11 @@ class SongCache(private val apiService: KuwoApiService) {
          *  解决"装 1.0.31 当时 4 源全失败 → 100 首歌全缓存空 list → 永远不重试"bug。 */
         val lyricsTriedAt: Long = 0L,
         val coverBitmap: Bitmap? = null
-    )
+    ) {
+        /** playUrl 是否存在且未超过 TTL */
+        fun isPlayUrlValid(now: Long, ttlMs: Long): Boolean =
+            playUrl != null && (now - playUrlFetchedAt) < ttlMs
+    }
 
     // 缓存 key 使用 Song.id（rid.toString()）。跨 IO/viewModel 协程读写，必须并发安全。
     private val cache: java.util.concurrent.ConcurrentHashMap<String, Entry> = java.util.concurrent.ConcurrentHashMap()
@@ -66,11 +72,12 @@ class SongCache(private val apiService: KuwoApiService) {
     /** 同步获取，已命中缓存返回 Entry，否则返回 null */
     fun get(song: Song): Entry? = cache[song.id]
 
-    /** 写入某首歌的 playUrl（保留 pic/lyrics/coverBitmap） */
+    /** 写入某首歌的 playUrl（保留 pic/lyrics/coverBitmap）。【1.0.36】写时盖时间戳用于 TTL 判断 */
     fun putPlayUrl(song: Song, url: String) {
         val existing = cache[song.id]
         cache[song.id] = Entry(
             playUrl = url,
+            playUrlFetchedAt = System.currentTimeMillis(),
             pic = existing?.pic ?: song.pic,
             lyrics = existing?.lyrics,
             coverBitmap = existing?.coverBitmap
@@ -80,12 +87,21 @@ class SongCache(private val apiService: KuwoApiService) {
     /** 清除某首歌的 playUrl（强制下次 getPlayUrl 重新拉） */
     fun invalidatePlayUrl(song: Song) {
         val existing = cache[song.id] ?: return
-        cache[song.id] = existing.copy(playUrl = null)
+        cache[song.id] = existing.copy(playUrl = null, playUrlFetchedAt = 0L)
     }
 
-    /** 缓存是否存在且可用（playUrl 非空） */
+    /** 【1.0.36】缓存是否存在且可用（playUrl 非空 AND 未超过 TTL） */
     fun hasPlayUrl(song: Song): Boolean =
-        cache[song.id]?.playUrl != null
+        cache[song.id]?.isPlayUrlValid(System.currentTimeMillis(), PLAY_URL_TTL_MS) == true
+
+    /**
+     * 【1.0.36】同步获取 TTL 有效的 playUrl。给 urlProvider 等不能在协程里阻塞的回调用。
+     * TTL 过期或未缓存返回 null，调用方应走 onPlayerError 自动重试路径。
+     */
+    fun getValidPlayUrl(song: Song): String? {
+        val e = cache[song.id] ?: return null
+        return if (e.isPlayUrlValid(System.currentTimeMillis(), PLAY_URL_TTL_MS)) e.playUrl else null
+    }
 
     /** 封面是否已预加载进内存（按 song.id 命中 cachedBitmaps，绕开原/增强 pic URL 不一致的 bug） */
     fun hasCover(song: Song): Boolean = cachedBitmaps.containsKey(song.id)
@@ -96,12 +112,24 @@ class SongCache(private val apiService: KuwoApiService) {
     /** 获取封面 Bitmap（按 song.id） */
     fun getCoverBitmap(song: Song): Bitmap? = cachedBitmaps[song.id]
 
-    /** 从缓存或网络加载播放地址（同步） */
+    /**
+     * 从缓存或网络加载播放地址。
+     * 【1.0.36】命中条件加 TTL：URL 过期视为未命中，强制重新拉。
+     */
     suspend fun loadOrGetPlayUrl(song: Song): String? {
-        cache[song.id]?.playUrl?.let { return it }
+        val e = cache[song.id]
+        if (e != null && e.isPlayUrlValid(System.currentTimeMillis(), PLAY_URL_TTL_MS)) {
+            return e.playUrl
+        }
         val url = apiService.getPlayUrl(song.musicRid).url
-        // 写回时用当前 song.pic（已增强），保持缓存图片URL与UI一致
-        cache[song.id] = Entry(playUrl = url, pic = song.pic, lyrics = cache[song.id]?.lyrics, coverBitmap = cache[song.id]?.coverBitmap)
+        // 写回时用当前 song.pic（已增强），保持缓存图片URL与UI一致；盖 playUrlFetchedAt 启动新一轮 TTL
+        cache[song.id] = Entry(
+            playUrl = url,
+            playUrlFetchedAt = System.currentTimeMillis(),
+            pic = song.pic,
+            lyrics = cache[song.id]?.lyrics,
+            coverBitmap = cache[song.id]?.coverBitmap
+        )
         return url
     }
 
@@ -316,14 +344,18 @@ class SongCache(private val apiService: KuwoApiService) {
     }
 
     /**
-     * 滑动窗口清理：只保留 [currentIdx, currentIdx + windowSize] 范围内的歌曲缓存。
+     * 滑动窗口清理：只保留 [currentIdx, currentIdx + windowSize) 范围内的歌曲缓存。
      * 在预加载前调用，确保缓存队列深度始终为 windowSize。
      * 同步清理 cache + cachedBitmaps + preloadedCoverUrls 三层缓存。
+     *
+     * 【1.0.36】默认 windowSize 改 4（1 当前 + 3 即将），跟 WINDOW_SIZE 常量一致。
      */
-    fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = 7) {
-        // windowSize = 7: 窗口 [currentIdx, currentIdx+7) 共 7 个位置
-        // → 覆盖"当前播放" + "接下来 6 首 preload"（currentIdx+1~currentIdx+6）
-        // → 之前 windowSize=6 时 currentIdx+6 那一首在窗口外，被 evict 误删 → 切到那首时 cachedBitmaps 空 → 重新下载
+    fun evictOutsideWindow(playlist: List<Song>, currentIdx: Int, windowSize: Int = WINDOW_SIZE) {
+        // windowSize = 4: 窗口 [currentIdx, currentIdx+4) 共 4 个位置
+        // → 覆盖"当前播放" + "接下来 3 首 preload"（currentIdx+1~currentIdx+3）
+        // 之前 WINDOW_SIZE=7 时窗口内 6 首拉满 6 个网络请求；
+        // 3 首足以覆盖正常切歌节奏（每首 3-4 分钟，3 首 ≈ 12 分钟），
+        // 配合 playUrl TTL=5min 防止 sig 过期、onPlayerError 自动重试兜底。
         if (playlist.isEmpty()) return
         val windowEnd = minOf(currentIdx + windowSize, playlist.size)
         val windowIds = (currentIdx until windowEnd)
@@ -344,12 +376,14 @@ class SongCache(private val apiService: KuwoApiService) {
      */
     fun preloadPlayUrls(songs: List<Song>) {
         songs.forEach { song ->
-            if (cache[song.id]?.playUrl == null) {
+            // 【1.0.36】命中判断改 TTL 感知：过期 URL 视为未命中强制重拉
+            if (!hasPlayUrl(song)) {
                 scope.launch {
                     val url = apiService.getPlayUrl(song.musicRid).url
                     val existing = cache[song.id]
                     cache[song.id] = Entry(
                         playUrl = url,
+                        playUrlFetchedAt = System.currentTimeMillis(),
                         pic = song.pic,
                         lyrics = existing?.lyrics,
                         coverBitmap = existing?.coverBitmap
@@ -525,6 +559,15 @@ class SongCache(private val apiService: KuwoApiService) {
 
     companion object {
         private const val TAG = "SongCache"
+
+        /** 【1.0.36】滑窗大小 = 1 当前 + 3 即将播放（之前 7 = 1+6） */
+        const val WINDOW_SIZE = 4
+        const val WINDOW_UPCOMING = 3
+
+        /** 【1.0.36】playUrl TTL。酷我 sig 实测 5-15 分钟，过 5 分钟强制重拉。
+         *  3 首 × 4 分钟 ≈ 12 分钟窗口 + 5 分钟 TTL → 2/3 可能过期，
+         *  但 onPlayerError 自动重试 1 次兜底，user 不会感知弹窗。 */
+        const val PLAY_URL_TTL_MS = 5 * 60 * 1000L
 
         @Volatile
         private var instance: SongCache? = null

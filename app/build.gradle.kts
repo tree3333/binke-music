@@ -11,8 +11,8 @@ android {
         applicationId = "com.binke.music"
         minSdk = 26
         targetSdk = 34
-        versionCode = 35
-        versionName = "1.0.35"
+        versionCode = 36
+        versionName = "1.0.36"
 
         vectorDrawables {
             useSupportLibrary = true

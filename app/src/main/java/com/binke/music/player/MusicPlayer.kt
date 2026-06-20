@@ -201,6 +201,39 @@ class MusicPlayer(private val context: Context) {
         }
     }
 
+    /**
+     * 【1.0.36】onPlayerError 自动重试入口：替换当前 MediaItem 的 URI 并重新 prepare。
+     * 用于 IO_BAD_HTTP_STATUS 等 URL 过期场景——拿新 URL 重试 1 次，不重建播放列表。
+     * @return 替换成功（player 非空、index 有效、url 非空）返回 true
+     */
+    fun retry(url: String): Boolean {
+        val p = player ?: run {
+            fileLog("retry() player 为空，跳过")
+            return false
+        }
+        if (url.isBlank()) {
+            fileLog("retry() url 为空，跳过")
+            return false
+        }
+        val idx = p.currentMediaItemIndex
+        if (idx < 0 || idx >= p.mediaItemCount) {
+            fileLog("retry() currentMediaItemIndex=$idx 越界 (count=${p.mediaItemCount})，跳过")
+            return false
+        }
+        val currentItem = p.getMediaItemAt(idx)
+        val updatedItem = MediaItem.Builder()
+            .setMediaId(currentItem.mediaId)
+            .setUri(url)
+            .setMimeType("audio/mpeg")
+            .setMediaMetadata(currentItem.mediaMetadata)
+            .build()
+        p.replaceMediaItem(idx, updatedItem)
+        p.prepare()
+        p.playWhenReady = true
+        fileLog("retry() 成功: replaceMediaItem idx=$idx url=${url.take(60)}, prepare+playWhenReady=true")
+        return true
+    }
+
     fun pause() {
         player?.pause()
     }

@@ -120,6 +120,12 @@ class MainViewModel(
     private val _playbackDebugParams = MutableStateFlow<String?>(null)
     val playbackDebugParams: StateFlow<String?> = _playbackDebugParams.asStateFlow()
 
+    /**
+     * 【1.0.36】记录"已对哪首 song 自动重试过"——同一首只允许自动重试 1 次，
+     * 第二次 onPlayerError 直接弹窗给 user。切歌时（_currentSong 改变）允许再重试。
+     */
+    private var lastAutoRetriedSongId: String? = null
+
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
 
@@ -213,8 +219,7 @@ class MainViewModel(
             _isPlaying.value = playing
         }
         musicPlayer.onPlaybackError = { error ->
-            _playbackError.value = error
-            _playbackDebugParams.value = buildPlaybackParams(_currentSong.value?.playUrl)
+            handlePlaybackError(error)
         }
         musicPlayer.onTrackEnded = {
             // SINGLE_LOOP 时让 ExoPlayer 自己处理（REPEAT_MODE_ONE），无需重新 playSong
@@ -233,6 +238,8 @@ class MainViewModel(
             if (newIndex in playlist.indices) {
                 _currentIndex.value = newIndex
                 _currentSong.value = playlist[newIndex]
+                // 【1.0.36】MediaSession 切歌（同 next/prev / 锁屏按钮）也重置自动重试标记
+                lastAutoRetriedSongId = null
                 triggerCoverPrediction(playlist[newIndex].pic)
                 _currentPosition.value = 1500L
                 // duration 不清零：保留上一首的 duration 作为占位，避免 ExoPlayer 报新 duration
@@ -244,10 +251,12 @@ class MainViewModel(
             }
             pendingMediaItemTransition = false
         }
-        // 注册 URL 提供器：从缓存读取 URL（由 playSong 预取时写入）
+        // 注册 URL 提供器：从缓存读取 URL（由 playSong 预取时写入）。
+        // 【1.0.36】走 getValidPlayUrl —— TTL 过期返回 null，ExoPlayer 继续用原 MediaItem URL，
+        // 拉流失败 → onPlayerError 触发 → ViewModel 自动重试 1 次兜底。
         musicPlayer.urlProvider = lambda@{ mediaId ->
             val song = _playlist.value.find { it.id == mediaId }
-            song?.let { songCache.get(it)?.playUrl }
+            song?.let { songCache.getValidPlayUrl(it) }
         }
 
         // APP 被系统杀掉后恢复时，同步当前播放状态（不依赖 onMediaItemTransition）
@@ -450,6 +459,8 @@ class MainViewModel(
             snapshotSong = song
             _currentIndex.value = snapshotIdx
         }
+        // 【1.0.36】切到新 song → 重置自动重试标记，新 song 允许再重试 1 次
+        lastAutoRetriedSongId = null
 
         viewModelScope.launch {
             _isLoading.value = true
@@ -544,12 +555,25 @@ class MainViewModel(
      * 预加载接下来最多 6 首的播放地址、歌词和封面图片。
      * 首次播放时调用以填充缓存；切歌时只追加新增的条目。
      */
+    /**
+     * 预加载即将播放的歌曲。
+     * 【1.0.36】滑窗缩到 4 首（1 当前 + 3 即将），配合 playUrl TTL=5min 防止 sig 过期。
+     *
+     * 切歌时意图：
+     * - 旧窗口 [N, N+4) 被 evict 滚出 1 首 N
+     * - 新窗口 [N+1, N+5) 滚进 1 首 N+4
+     * - 必补 1 首：N+4
+     * - seek 兜底：拖动进度条后窗口内可能有几首空缺，一起补
+     *
+     * 随机模式：不知道具体下一首，把窗口内未缓存的全补上（最多 WINDOW_UPCOMING=3 首）
+     * 单曲循环：无需预加载
+     */
     private fun preloadUpcoming() {
         val playlist = _playlist.value
         val currentIdx = _currentIndex.value
         if (playlist.isEmpty()) return
 
-        // 滑动窗口清理：只保留 [currentIdx, currentIdx + 6]，移除已播放的条目
+        // 滑窗清理：只保留 [currentIdx, currentIdx + WINDOW_SIZE)
         songCache.evictOutsideWindow(playlist, currentIdx)
 
         val upcoming = mutableListOf<Song>()
@@ -561,14 +585,23 @@ class MainViewModel(
                 return
             }
             PlayMode.SHUFFLE -> {
-                // 随机模式不知道具体下一首，随机取未缓存的 3 首
-                upcoming.addAll(playlist.filter { songCache.get(it) == null }.take(6))
+                // 随机模式：取窗口内未缓存的（首次启动全空 → 补 3 首；正常随时只补缺）
+                val window = (1..SongCache.WINDOW_UPCOMING).mapNotNull { off ->
+                    playlist.getOrNull((currentIdx + off) % size)
+                }
+                upcoming.addAll(window.filter { !songCache.hasPlayUrl(it) })
             }
             PlayMode.LIST_LOOP -> {
-                for (offset in 1..6) {
-                    val idx = (currentIdx + offset) % size
-                    val song = playlist[idx]
-                    if (songCache.get(song) == null) {
+                // 必补 1 首：滚进来那首 (currentIdx + WINDOW_SIZE)，取模处理列表末→首
+                val nextIdx = (currentIdx + SongCache.WINDOW_SIZE) % size
+                playlist.getOrNull(nextIdx)?.let { song ->
+                    if (!songCache.hasPlayUrl(song)) upcoming.add(song)
+                }
+                // seek 兜底：拖动进度条后窗口内某些位置可能没缓存（比如跨过几首）
+                for (off in 1 until SongCache.WINDOW_SIZE) {
+                    val idx = (currentIdx + off) % size
+                    val song = playlist.getOrNull(idx) ?: continue
+                    if (song !in upcoming && !songCache.hasPlayUrl(song)) {
                         upcoming.add(song)
                     }
                 }
@@ -756,6 +789,47 @@ class MainViewModel(
     fun clearPlaybackError() {
         _playbackError.value = null
         _playbackDebugParams.value = null
+    }
+
+    /**
+     * 【1.0.36】onPlaybackError 处理函数。
+     * - IO_BAD_HTTP_STATUS（URL 过期/CDN 鉴权失效）且当前 song 没自动重试过 → 静默重试 1 次
+     *   重试成功不弹窗；新 URL 拉不到才弹窗给 user
+     * - 其它错误（解码失败、网络断开等）直接弹窗
+     *
+     * lastAutoRetriedSongId 在 playSong / onMediaItemTransition 切歌时重置，
+     * 保证新 song 允许再自动重试 1 次。
+     */
+    private fun handlePlaybackError(error: String) {
+        val currentSongId = _currentSong.value?.id
+        val isHttpStatusError = error.contains("ERROR_CODE_IO_BAD_HTTP_STATUS", ignoreCase = true)
+        val shouldAutoRetry = isHttpStatusError && currentSongId != null && currentSongId != lastAutoRetriedSongId
+        if (shouldAutoRetry) {
+            val song = _currentSong.value ?: return
+            lastAutoRetriedSongId = currentSongId
+            viewModelScope.launch(Dispatchers.IO) {
+                songCache.invalidatePlayUrl(song)
+                val newUrl = songCache.loadOrGetPlayUrl(song)
+                withContext(Dispatchers.Main) {
+                    if (!newUrl.isNullOrBlank() && musicPlayer.retry(newUrl)) {
+                        android.util.Log.i(
+                            "MainViewModel",
+                            "auto-retry OK: songId=$currentSongId, url=${newUrl.take(60)}"
+                        )
+                    } else {
+                        // 新 URL 拉不到 / retry 失败 → 弹窗
+                        showPlaybackError(error)
+                    }
+                }
+            }
+        } else {
+            showPlaybackError(error)
+        }
+    }
+
+    private fun showPlaybackError(error: String) {
+        _playbackError.value = error
+        _playbackDebugParams.value = buildPlaybackParams(_currentSong.value?.playUrl)
     }
 
     private fun buildPlaybackParams(url: String?): String {
