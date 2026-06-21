@@ -564,10 +564,10 @@ class SongCache(private val apiService: KuwoApiService) {
         const val WINDOW_SIZE = 4
         const val WINDOW_UPCOMING = 3
 
-        /** 【1.0.36】playUrl TTL。酷我 sig 实测 5-15 分钟，过 5 分钟强制重拉。
-         *  3 首 × 4 分钟 ≈ 12 分钟窗口 + 5 分钟 TTL → 2/3 可能过期，
-         *  但 onPlayerError 自动重试 1 次兜底，user 不会感知弹窗。 */
-        const val PLAY_URL_TTL_MS = 5 * 60 * 1000L
+        /** 【1.0.36】playUrl TTL。酷我 sig 实测 5-15 分钟，
+         *  单首 < 10min 走 TTL 不弹窗；>= 10min 由 onPlayerError 自动重试兜底。
+         *  3 首窗口 + 自动重试配合，确保长歌/混音不弹窗。 */
+        const val PLAY_URL_TTL_MS = 10 * 60 * 1000L
 
         @Volatile
         private var instance: SongCache? = null

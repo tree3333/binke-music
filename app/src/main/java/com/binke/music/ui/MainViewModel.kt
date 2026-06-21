@@ -820,6 +820,8 @@ class MainViewModel(
             val newUrl = songCache.loadOrGetPlayUrl(song)
             withContext(Dispatchers.Main) {
                 if (!newUrl.isNullOrBlank() && musicPlayer.retry(newUrl)) {
+                    // 【1.0.36+】重试成功：重置冷却，下次 onPlayerError 立即允许再重试
+                    lastAutoRetryAt = 0L
                     android.util.Log.i(
                         "MainViewModel",
                         "auto-retry OK: songId=${song.id}, url=${newUrl.take(60)}"
