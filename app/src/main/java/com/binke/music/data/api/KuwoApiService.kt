@@ -482,23 +482,29 @@ class KuwoApiService {
             val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return Result.success(emptyList())
             if (songs.length() == 0) return Result.success(emptyList())
 
-            // 在前5个结果中匹配歌手名（排除"周杰伦-"这类带后缀的误匹配）
+            // 在前10个结果中同时匹配「歌手+歌名」，避免「童年 - 卓依婷」命中「卓依婷 - 明天会更好」搜词
+            // 历史 bug（1.0.37 修复）：只匹配歌手名会选中「童年 - 卓依婷」，网易云 LRC 库对它错配了罗大佑原版童年歌词
+            // → 用户播放「卓依婷 - 明天会更好」时显示「罗大佑 - 童年」歌词
             var songId: String? = null
-            for (i in 0 until minOf(5, songs.length())) {
+            val targetName = name.trim()
+            for (i in 0 until minOf(10, songs.length())) {
                 val s = songs.getJSONObject(i)
                 val artists = s.optJSONArray("artists")
-                val matched = (0 until (artists?.length() ?: 0)).any { idx ->
+                val artistMatched = (0 until (artists?.length() ?: 0)).any { idx ->
                     val an = artists.getJSONObject(idx).optString("name", "")
                     // 精确匹配或前缀匹配（排除"周杰伦-"这种带后缀的）
                     (an == artist.trim()) || (artist.isNotBlank() && an.startsWith(artist.trim()) && (an.length == artist.trim().length || an[artist.trim().length] == ' '))
                 }
-                if (matched) {
+                val sName = s.optString("name", "")
+                val nameMatched = isLyricsNameMatch(sName, targetName)
+                if (artistMatched && nameMatched) {
                     songId = s.optString("id")
                     break
                 }
             }
-            // 没找到精确匹配，取第一首（防止完全搜不到）
-            if (songId == null) songId = songs.getJSONObject(0).optString("id")
+            // 【1.0.37 修复】不再 fallback 到第一首：之前 fallback 会选中「童年 - 卓依婷」导致显示罗大佑童年歌词
+            // 找不到匹配返回空，宁可显示"暂无歌词"也不要显示错歌词
+            if (songId == null) return Result.success(emptyList())
 
             val lrcUrl = "https://music.163.com/api/song/lyric?id=$songId&lv=1&kv=1&tv=-1"
             val lrcRequest = Request.Builder()
@@ -534,19 +540,22 @@ class KuwoApiService {
             val json = JSONObject(respStr)
             val songs = json.optJSONObject("data")?.optJSONObject("song")?.optJSONArray("list") ?: return Result.success(emptyList())
 
+            // 「歌名+歌手」同时匹配（避免同名翻唱 / 错位）
+            // 历史 bug（1.0.37 修复）：只匹配歌手名会选错歌；QQ 接口是用歌名作 query，结果里歌手匹配通过但歌名不匹配
             var songmid: String? = null
+            val targetName = name.trim()
             for (i in 0 until songs.length()) {
                 val s = songs.getJSONObject(i)
                 val singers = s.optJSONArray("singer")
                 val singerNames = (0 until (singers?.length() ?: 0)).mapNotNull { singers?.getJSONObject(it)?.optString("name") }
-                if (singerNames.any { it.contains(artist) || artist.contains(it) } || artist.isBlank()) {
+                val singerMatch = singerNames.any { it.contains(artist) || artist.contains(it) }
+                val nameMatch = isLyricsNameMatch(s.optString("songname", ""), targetName)
+                if (singerMatch && nameMatch) {
                     songmid = s.optString("songmid")
                     break
                 }
             }
-            if (songmid == null && songs.length() > 0) {
-                songmid = songs.getJSONObject(0).optString("songmid")
-            }
+            // 都没匹配上：返回空，不再 fallback 到第一首（fallback 会选错歌）
             if (songmid == null) return Result.success(emptyList())
 
             val lrcUrl = "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=$songmid&format=json&nobase64=1"
@@ -627,17 +636,23 @@ class KuwoApiService {
             val songs = (searchJson.optJSONObject("data")?.optJSONArray("info")) ?: return Result.success(emptyList())
             if (songs.length() == 0) return Result.success(emptyList())
 
-            // 优先取歌手匹配的（避免同名 remix / 翻唱）
-            var pickIdx = 0
+            // 优先取「歌手+歌名」都匹配的（避免同名 remix / 翻唱 / 错位）
+            // 历史 bug（1.0.37 修复）：只匹配歌手会选错歌，比如搜「卓依婷 明天会更好」匹配到「捉泥鳅 - 卓依婷」等
+            var pickIdx = -1
             if (artist.isNotBlank()) {
-                for (i in 0 until minOf(5, songs.length())) {
-                    val singer = songs.getJSONObject(i).optString("singername", "")
-                    if (singer.isNotBlank() && (artist.trim() in singer || singer in artist.trim())) {
+                for (i in 0 until minOf(10, songs.length())) {
+                    val song = songs.getJSONObject(i)
+                    val singer = song.optString("singername", "")
+                    val singerMatch = singer.isNotBlank() && (artist.trim() in singer || singer in artist.trim())
+                    val nameMatch = isLyricsNameMatch(song.optString("songname", ""), name.trim())
+                    if (singerMatch && nameMatch) {
                         pickIdx = i
                         break
                     }
                 }
             }
+            // 都没匹配上：返回空，不再 fallback（fallback 会选错歌）
+            if (pickIdx < 0) return Result.success(emptyList())
             val pick = songs.getJSONObject(pickIdx)
             val hash = pick.optString("hash", "")
             if (hash.isBlank()) return Result.failure(Exception("酷狗无 hash"))
@@ -679,6 +694,34 @@ class KuwoApiService {
             Log.e("KuwoApi", "searchLyricsKugou error", e)
             Result.failure(e)
         }
+    }
+
+    /**
+     * 校验候选歌名是否匹配目标歌名（兜底源选曲用，1.0.37 新增）
+     * 规则（任一满足即匹配）：
+     *  1. 完全相等
+     *  2. 双向 normalize 后互相包含（处理 "明天会更好（Cover 卓依婷）" vs "明天会更好"、括号扩展、变体名）
+     *  3. 核心 2 字 token 命中（target 至少 2 字符时）
+     * 不匹配 case：
+     *   - candidate="童年" target="明天会更好" → 不匹配
+     *   - candidate="捉泥鳅" target="童年" → 不匹配
+     */
+    private fun isLyricsNameMatch(candidate: String, target: String): Boolean {
+        val c = normalizeForNameMatch(candidate)
+        val t = normalizeForNameMatch(target)
+        if (t.isEmpty() || c.isEmpty()) return false
+        if (c == t) return true
+        if (c.contains(t) || t.contains(c)) return true
+        if (t.length >= 2 && t.take(2) in c) return true
+        return false
+    }
+
+    private fun normalizeForNameMatch(s: String): String {
+        // 去除括号内容（中英文）、空白、横线、下划线
+        return s.replace(Regex("[\\s\\-_()（）\\[\\]【】]"), "")
+                .replace(Regex("（[^）]*）"), "")
+                .replace(Regex("\\([^)]*\\)"), "")
+                .trim()
     }
 
     private fun parseLrcText(lrcText: String): List<LrcLine> {
