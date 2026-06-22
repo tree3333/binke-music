@@ -470,7 +470,8 @@ class KuwoApiService {
             val searchName = "${name.trim()} ${artist.trim()}"
             val encoded = URLEncoder.encode(searchName, "UTF-8")
             val searchUrl = "https://music.163.com/api/search/get"
-            val body = "s=$encoded&type=1&limit=5&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
+            // 【1.0.38】limit 5 → 20，覆盖更多长尾候选
+            val body = "s=$encoded&type=1&limit=20&offset=0".toRequestBody("application/x-www-form-urlencoded".toMediaType())
             val request = Request.Builder()
                 .url(searchUrl)
                 .post(body)
@@ -482,19 +483,18 @@ class KuwoApiService {
             val songs = searchJson.optJSONObject("result")?.optJSONArray("songs") ?: return Result.success(emptyList())
             if (songs.length() == 0) return Result.success(emptyList())
 
-            // 在前10个结果中同时匹配「歌手+歌名」，避免「童年 - 卓依婷」命中「卓依婷 - 明天会更好」搜词
+            // 在前 20 个结果中同时匹配「歌手+歌名」，避免「童年 - 卓依婷」命中「卓依婷 - 明天会更好」搜词
             // 历史 bug（1.0.37 修复）：只匹配歌手名会选中「童年 - 卓依婷」，网易云 LRC 库对它错配了罗大佑原版童年歌词
             // → 用户播放「卓依婷 - 明天会更好」时显示「罗大佑 - 童年」歌词
+            // 【1.0.38】artist 匹配升级：支持复合 artist（"王铮亮&谭松韵" vs 候选 ["谭松韵","王铮亮"]）
             var songId: String? = null
             val targetName = name.trim()
-            for (i in 0 until minOf(10, songs.length())) {
+            for (i in 0 until minOf(20, songs.length())) {
                 val s = songs.getJSONObject(i)
                 val artists = s.optJSONArray("artists")
-                val artistMatched = (0 until (artists?.length() ?: 0)).any { idx ->
-                    val an = artists.getJSONObject(idx).optString("name", "")
-                    // 精确匹配或前缀匹配（排除"周杰伦-"这种带后缀的）
-                    (an == artist.trim()) || (artist.isNotBlank() && an.startsWith(artist.trim()) && (an.length == artist.trim().length || an[artist.trim().length] == ' '))
-                }
+                val candArtists = (0 until (artists?.length() ?: 0))
+                    .mapNotNull { idx -> artists?.getJSONObject(idx)?.optString("name", "") }
+                val artistMatched = isArtistMatch(candArtists, artist)
                 val sName = s.optString("name", "")
                 val nameMatched = isLyricsNameMatch(sName, targetName)
                 if (artistMatched && nameMatched) {
@@ -524,66 +524,6 @@ class KuwoApiService {
     }
 
     /**
-     * QQ音乐歌词搜索（备用）
-     * @return Result.success(list) 或 Result.failure(exception)
-     */
-    fun searchLyricsQQ(name: String, artist: String): Result<List<LrcLine>> {
-        return try {
-            val encoded = URLEncoder.encode(name.trim(), "UTF-8")
-            val searchUrl = "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=$encoded&format=json&p=1&n=5"
-            val request = Request.Builder()
-                .url(searchUrl)
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .addHeader("Referer", "https://y.qq.com/")
-                .build()
-            val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return Result.failure(Exception("QQ音乐搜索请求为空")) }
-            val json = JSONObject(respStr)
-            val songs = json.optJSONObject("data")?.optJSONObject("song")?.optJSONArray("list") ?: return Result.success(emptyList())
-
-            // 「歌名+歌手」同时匹配（避免同名翻唱 / 错位）
-            // 历史 bug（1.0.37 修复）：只匹配歌手名会选错歌；QQ 接口是用歌名作 query，结果里歌手匹配通过但歌名不匹配
-            var songmid: String? = null
-            val targetName = name.trim()
-            for (i in 0 until songs.length()) {
-                val s = songs.getJSONObject(i)
-                val singers = s.optJSONArray("singer")
-                val singerNames = (0 until (singers?.length() ?: 0)).mapNotNull { singers?.getJSONObject(it)?.optString("name") }
-                val singerMatch = singerNames.any { it.contains(artist) || artist.contains(it) }
-                val nameMatch = isLyricsNameMatch(s.optString("songname", ""), targetName)
-                if (singerMatch && nameMatch) {
-                    songmid = s.optString("songmid")
-                    break
-                }
-            }
-            // 都没匹配上：返回空，不再 fallback 到第一首（fallback 会选错歌）
-            if (songmid == null) return Result.success(emptyList())
-
-            val lrcUrl = "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=$songmid&format=json&nobase64=1"
-            val lrcRequest = Request.Builder()
-                .url(lrcUrl)
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .addHeader("Referer", "https://y.qq.com/portal/player.html")
-                .build()
-            val lrcResp = browserClient.newCall(lrcRequest).execute().use { it.body?.string() ?: return Result.failure(Exception("QQ音乐歌词请求为空")) }
-
-            val lrcJsonStr = lrcResp.trim().let {
-                val start = it.indexOf('{')
-                val end = it.lastIndexOf('}') + 1
-                if (start >= 0 && end > start) it.substring(start, end) else it
-            }
-            val lrcJson = JSONObject(lrcJsonStr)
-            val lrcText = lrcJson.optString("lyric", "").takeIf { it.isNotBlank() }
-                ?: lrcJson.optJSONObject("lyric")?.optString("lyric", "")?.takeIf { it.isNotBlank() }
-                ?: return Result.success(emptyList())
-
-            Result.success(parseLrcText(lrcText))
-        } catch (e: Exception) {
-            Log.e("KuwoApi", "searchLyricsQQ error", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
      * lrclib.net 公共歌词库（备用）
      * @return Result.success(list) 或 Result.failure(exception)
      */
@@ -591,6 +531,7 @@ class KuwoApiService {
         return try {
             val trackEncoded = URLEncoder.encode(name.trim(), "UTF-8")
             val artistEncoded = URLEncoder.encode(artist.trim(), "UTF-8")
+            // 【1.0.38】先精确查（get），找不到再 search 兜底
             val url = "https://lrclib.net/api/get?artist_name=$artistEncoded&track_name=$trackEncoded"
             val request = Request.Builder()
                 .url(url)
@@ -600,13 +541,42 @@ class KuwoApiService {
             val respStr = browserClient.newCall(request).execute().use { it.body?.string() ?: return Result.failure(Exception("lrclib请求为空")) }
             val json = JSONObject(respStr)
             val syncedLyrics = json.optString("syncedLyrics", "")
-            if (syncedLyrics.isBlank()) {
-                val plainLyrics = json.optString("plainLyrics", "")
-                if (plainLyrics.isBlank()) return Result.success(emptyList())
-                // 纯文本歌词转同步格式（无时间戳，每行一句）
+            if (syncedLyrics.isNotBlank()) {
+                return Result.success(parseLrcText(syncedLyrics))
+            }
+            val plainLyrics = json.optString("plainLyrics", "")
+            if (plainLyrics.isNotBlank()) {
                 return Result.success(parseLrcText("[00:00]$plainLyrics"))
             }
-            Result.success(parseLrcText(syncedLyrics))
+            // 精确查无果 → search 兜底
+            val searchUrl = "https://lrclib.net/api/search?artist_name=$artistEncoded&track_name=$trackEncoded"
+            val searchReq = Request.Builder()
+                .url(searchUrl)
+                .get()
+                .addHeader("User-Agent", BROWSER_UA)
+                .build()
+            val searchStr = browserClient.newCall(searchReq).execute().use { it.body?.string() ?: return Result.success(emptyList()) }
+            val arr = org.json.JSONArray(searchStr)
+            if (arr.length() == 0) return Result.success(emptyList())
+            // 优先选「歌名匹配」的；都没匹配就用第一个有歌词的
+            for (i in 0 until arr.length()) {
+                val it = arr.getJSONObject(i)
+                val candName = it.optString("trackName").ifBlank { it.optString("name") }
+                if (isLyricsNameMatch(candName, name.trim())) {
+                    val s = it.optString("syncedLyrics")
+                    if (s.isNotBlank()) return Result.success(parseLrcText(s))
+                    val p = it.optString("plainLyrics")
+                    if (p.isNotBlank()) return Result.success(parseLrcText("[00:00]$p"))
+                }
+            }
+            for (i in 0 until arr.length()) {
+                val it = arr.getJSONObject(i)
+                val s = it.optString("syncedLyrics")
+                if (s.isNotBlank()) return Result.success(parseLrcText(s))
+                val p = it.optString("plainLyrics")
+                if (p.isNotBlank()) return Result.success(parseLrcText("[00:00]$p"))
+            }
+            Result.success(emptyList())
         } catch (e: Exception) {
             Log.e("KuwoApi", "searchLyricsLrclib error", e)
             Result.failure(e)
@@ -623,8 +593,8 @@ class KuwoApiService {
     fun searchLyricsKugou(name: String, artist: String): Result<List<LrcLine>> {
         return try {
             val query = URLEncoder.encode("${name.trim()} ${artist.trim()}", "UTF-8")
-            // 1) 搜索
-            val searchUrl = "https://msearch.kugou.com/api/v3/search/song?keyword=$query&page=1&pagesize=5"
+            // 1) 搜索。【1.0.38】pagesize 5 → 20，覆盖更多长尾候选
+            val searchUrl = "https://msearch.kugou.com/api/v3/search/song?keyword=$query&page=1&pagesize=20"
             val searchReq = Request.Builder()
                 .url(searchUrl)
                 .get()
@@ -638,12 +608,15 @@ class KuwoApiService {
 
             // 优先取「歌手+歌名」都匹配的（避免同名 remix / 翻唱 / 错位）
             // 历史 bug（1.0.37 修复）：只匹配歌手会选错歌，比如搜「卓依婷 明天会更好」匹配到「捉泥鳅 - 卓依婷」等
+            // 【1.0.38】artist 匹配升级：支持复合 artist + "/"" 分隔
+            // 酷狗 singername 字段是 "A/B/C" 形式，需先按 "/" 拆开
             var pickIdx = -1
             if (artist.isNotBlank()) {
-                for (i in 0 until minOf(10, songs.length())) {
+                for (i in 0 until minOf(20, songs.length())) {
                     val song = songs.getJSONObject(i)
                     val singer = song.optString("singername", "")
-                    val singerMatch = singer.isNotBlank() && (artist.trim() in singer || singer in artist.trim())
+                    val candArtists = if (singer.isNotBlank()) singer.split("/") else emptyList()
+                    val singerMatch = isArtistMatch(candArtists, artist.trim())
                     val nameMatch = isLyricsNameMatch(song.optString("songname", ""), name.trim())
                     if (singerMatch && nameMatch) {
                         pickIdx = i
@@ -714,6 +687,41 @@ class KuwoApiService {
         if (c.contains(t) || t.contains(c)) return true
         if (t.length >= 2 && t.take(2) in c) return true
         return false
+    }
+
+    /**
+     * 校验候选 artist（数组）是否匹配源 artist（v1.0.38 新增）
+     * 支持复合 artist：源 "A&B&C" vs 候选 ["A", "B", "C"] → True
+     * 兼容分隔符：& / 、 , ， ; ； 空白 都视为分隔
+     * 容许候选比源多（feat./伴奏等附加），但源的所有 token 必须全部出现在候选里
+     * 单 artist 兼容原行为：精确相等 / 前缀+后置空白或分隔符
+     */
+    private fun isArtistMatch(candidateArtists: List<String>, sourceArtist: String): Boolean {
+        if (sourceArtist.isBlank()) return false
+        val src = sourceArtist.trim()
+        val srcTokens = splitArtistTokens(src)
+        if (srcTokens.isEmpty()) return false
+        val candTokens = mutableListOf<String>()
+        for (a in candidateArtists) {
+            if (a.isNotBlank()) candTokens.addAll(splitArtistTokens(a))
+        }
+        if (candTokens.isEmpty()) return false
+        // 复合 artist 匹配：源所有 token 都在候选里
+        if (srcTokens.size >= 2) {
+            return srcTokens.all { it in candTokens }
+        }
+        // 单 artist：精确等 OR 前缀+边界
+        val t = srcTokens[0]
+        for (a in candidateArtists) {
+            val s = a.trim()
+            if (s == t) return true
+            if (s.startsWith(t) && (s.length == t.length || s[t.length] in " /&、,，;；")) return true
+        }
+        return false
+    }
+
+    private fun splitArtistTokens(s: String): List<String> {
+        return s.split(Regex("[&/、,，;；\\s]+")).map { it.trim() }.filter { it.isNotEmpty() }
     }
 
     private fun normalizeForNameMatch(s: String): String {

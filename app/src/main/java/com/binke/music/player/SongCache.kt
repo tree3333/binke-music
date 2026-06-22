@@ -258,42 +258,7 @@ class SongCache(private val apiService: KuwoApiService) {
             }
         }
 
-        // 4. QQ 音乐歌词兜底
-        if (lyrics.isEmpty()) {
-            val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
-            var qr = apiService.searchLyricsQQ(cleanName, song.artist)
-            sourcesTried++
-            if (qr.isSuccess) {
-                val n = qr.getOrNull()?.size ?: 0
-                if (n > 0) {
-                    log("  lyric-qq: success, lines=$n")
-                    lyrics = qr.getOrNull()!!
-                } else {
-                    log("  lyric-qq: 200 but empty result")
-                }
-            } else {
-                log("  lyric-qq: fail, err=${qr.exceptionOrNull()?.message?.take(80)}")
-                for (attempt in 0..1) {
-                    delay(500)
-                    qr = apiService.searchLyricsQQ(cleanName, song.artist)
-                    sourcesTried++
-                    if (qr.isSuccess) {
-                        val n = qr.getOrNull()?.size ?: 0
-                        if (n > 0) {
-                            log("  lyric-qq: success (retry ${attempt + 1}), lines=$n")
-                            lyrics = qr.getOrNull()!!
-                        } else {
-                            log("  lyric-qq: 200 but empty (retry ${attempt + 1})")
-                        }
-                        break
-                    } else {
-                        log("  lyric-qq: fail (retry ${attempt + 1}), err=${qr.exceptionOrNull()?.message?.take(80)}")
-                    }
-                }
-            }
-        }
-
-        // 5. lrclib.net 公共歌词库兜底
+        // 4. lrclib.net 公共歌词库兜底（v1.0.38：原 QQ 源已删除，被墙/失效 0 命中）
         if (lyrics.isEmpty()) {
             val cleanName = song.name.replace(Regex("（[^）]*）|\\([^)]*\\)"), "").trim()
             var lr = apiService.searchLyricsLrclib(cleanName, song.artist)
